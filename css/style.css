@@ -1,0 +1,107 @@
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap');
+
+:root {
+  --primary: #4F46E5;
+  --secondary: #0EA5E9;
+  --accent: #F43F5E;
+  --positive: #10B981;
+  --negative: #F43F5E;
+  --neutral: #F59E0B;
+  --bg: #F8FAFC;
+  --surface: rgba(255, 255, 255, 0.7);
+  --text-dark: #0F172A;
+  --text-light: #64748B;
+  --border: rgba(255, 255, 255, 0.6);
+  --shadow: 0 10px 40px -10px rgba(15, 23, 42, 0.08);
+  --radius: 24px;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: 'Cairo', sans-serif;
+  background: var(--bg);
+  color: var(--text-dark);
+  direction: rtl;
+  min-height: 100vh;
+  position: relative;
+  overflow-x: hidden;
+}
+
+/* Background animated blobs */
+body::before, body::after {
+  content: ''; position: fixed; border-radius: 50%; filter: blur(100px); z-index: -1; animation: float 10s infinite alternate; width: 450px; height: 450px;
+}
+body::before { background: rgba(79, 70, 229, 0.15); top: -100px; right: -100px; }
+body::after { background: rgba(14, 165, 233, 0.15); bottom: -100px; left: -100px; animation-delay: -5s; }
+
+@keyframes float {
+  0% { transform: translateY(0) scale(1); }
+  100% { transform: translateY(50px) scale(1.1); }
+}
+
+/* Typography */
+h1, h2, h3, h4 { font-weight: 800; color: var(--text-dark); letter-spacing: -0.02em; }
+p { color: var(--text-light); line-height: 1.7; }
+
+/* Layouts */
+.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
+
+/* Glassmorphism Classes */
+.glass-panel {
+  background: var(--surface);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+/* Buttons */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 14px 32px; border-radius: 14px; font-weight: 700;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer; text-decoration: none; border: none;
+  gap: 8px; font-family: inherit; font-size: 1rem;
+}
+.btn-primary {
+  background: linear-gradient(135deg, var(--primary), var(--secondary));
+  color: white; box-shadow: 0 8px 25px rgba(79, 70, 229, 0.3);
+}
+.btn-primary:hover {
+  transform: translateY(-3px); box-shadow: 0 12px 35px rgba(79, 70, 229, 0.4);
+}
+.btn-outline {
+  border: 2px solid rgba(15, 23, 42, 0.1); color: var(--text-dark); background: rgba(255, 255, 255, 0.5);
+}
+.btn-outline:hover { background: white; border-color: rgba(15, 23, 42, 0.2); transform: translateY(-2px); }
+
+/* Navigation */
+.navbar {
+  padding: 24px 0; position: sticky; top: 0; z-index: 100;
+  background: rgba(248, 250, 252, 0.6); backdrop-filter: blur(16px);
+  border-bottom: 1px solid rgba(255,255,255,0.4);
+}
+.navbar .container { display: flex; justify-content: space-between; align-items: center; }
+.logo { font-size: 1.8rem; font-weight: 800; background: linear-gradient(135deg, var(--primary), var(--secondary)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; text-decoration: none; display: flex; align-items: center; gap: 8px;}
+/* .logo::before { content: '✨'; font-size: 1.5rem; } */
+.nav-links { display: flex; gap: 40px; align-items: center; }
+.nav-links a { text-decoration: none; color: var(--text-dark); font-weight: 600; transition: color 0.2s; }
+.nav-links a:hover { color: var(--primary); }
+
+/* Animations Utilities */
+.fade-in-up { animation: fadeInUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards; opacity: 0; transform: translateY(30px); }
+.delay-1 { animation-delay: 0.15s; }
+.delay-2 { animation-delay: 0.3s; }
+.delay-3 { animation-delay: 0.45s; }
+
+@keyframes fadeInUp {
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Forms */
+.form-group { margin-bottom: 24px; text-align: right; }
+.form-group label { display: block; margin-bottom: 8px; font-weight: 600; color: var(--text-dark); }
+.form-control { width: 100%; padding: 14px 20px; border-radius: 12px; border: 2px solid rgba(0,0,0,0.05); background: rgba(255,255,255,0.8); font-family: inherit; font-size: 1rem; transition: all 0.3s; outline: none; }
+.form-control:focus { border-color: var(--primary); background: white; box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.1); }

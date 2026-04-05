@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>تسجيل الدخول | Analytica</title>
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        body { display: flex; align-items: center; justify-content: center; min-height: 100vh; background-image: radial-gradient(circle at 50% 50%, rgba(79, 70, 229, 0.05) 0%, transparent 50%); }
+        .auth-container { width: 100%; max-width: 480px; background: rgba(255,255,255,0.85); backdrop-filter: blur(20px); padding: 48px; border-radius: var(--radius); z-index: 10; position: relative; box-shadow: 0 40px 80px rgba(0,0,0,0.08); border: 1px solid var(--border); }
+        .auth-header { text-align: center; margin-bottom: 40px; }
+        .auth-header h2 { font-size: 2.2rem; margin-bottom: 8px; }
+        .btn-full { width: 100%; margin-top: 16px; font-size: 1.1rem; padding: 16px; }
+        .switch-auth { text-align: center; margin-top: 24px; font-weight: 600; color: var(--text-light); }
+        .switch-auth a { color: var(--primary); text-decoration: none; cursor: pointer; transition: 0.2s; border-bottom: 2px dashed transparent; }
+        .switch-auth a:hover { color: var(--secondary); border-color: var(--secondary); }
+        .auth-forms-wrapper { position: relative; overflow: hidden; }
+        .auth-form { transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
+        .hidden-form { display: none; opacity: 0; transform: translateX(30px); }
+        .back-home { position: absolute; top: 40px; right: 40px; font-weight: 700; text-decoration: none; color: var(--text-light); background: white; padding: 12px 24px; border-radius: 100px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); display: flex; align-items: center; gap: 8px;}
+        .back-home:hover { color: var(--primary); transform: translateY(-2px); }
+    </style>
+</head>
+<body>
+    <a href="index.html" class="back-home fade-in-up">🏠 العودة للرئيسية</a>
+
+    <div class="auth-container fade-in-up">
+        <!-- Login Form -->
+        <div id="login-form" class="auth-form">
+            <div class="auth-header">
+                <h2>مرحباً بعودتك 👋</h2>
+                <p>سجل دخولك للوصول إلى لوحة التحكم</p>
+            </div>
+            <form action="dashboard.html">
+                <div class="form-group">
+                    <label>البريد الإلكتروني</label>
+                    <input type="email" class="form-control" placeholder="example@domain.com" required>
+                </div>
+                <div class="form-group">
+                    <label>كلمة المرور</label>
+                    <input type="password" class="form-control" placeholder="أدخل كلمة المرور" required>
+                </div>
+                <button type="submit" class="btn btn-primary btn-full">تسجيل الدخول</button>
+            </form>
+            <div class="switch-auth">
+                ليس لديك حساب؟ <a onclick="toggleAuth()">إنشاء حساب جديد</a>
+            </div>
+        </div>
+
+        <!-- Register Form -->
+        <div id="register-form" class="auth-form hidden-form">
+            <div class="auth-header">
+                <h2>إنشاء حساب جديد 🚀</h2>
+                <p>انضم إلينا وابدأ في تحليل بياناتك بكل سهولة</p>
+            </div>
+            <form action="dashboard.html">
+                <div class="form-group">
+                    <label>الاسم الكامل</label>
+                    <input type="text" class="form-control" placeholder="الاسم هنا" required>
+                </div>
+                <div class="form-group">
+                    <label>البريد الإلكتروني</label>
+                    <input type="email" class="form-control" placeholder="example@domain.com" required>
+                </div>
+                <div class="form-group">
+                    <label>كلمة المرور</label>
+                    <input type="password" class="form-control" placeholder="كلمة مرور قوية" required>
+                </div>
+                <button type="submit" class="btn btn-primary btn-full">إنشاء حساب</button>
+            </form>
+            <div class="switch-auth">
+                لديك حساب بالفعل؟ <a onclick="toggleAuth()">تسجيل الدخول</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function toggleAuth() {
+            const loginForm = document.getElementById('login-form');
+            const registerForm = document.getElementById('register-form');
+            if (loginForm.classList.contains('hidden-form')) {
+                loginForm.style.display = 'block'; setTimeout(() => { loginForm.classList.remove('hidden-form'); }, 50);
+                registerForm.classList.add('hidden-form'); setTimeout(() => { registerForm.style.display = 'none'; }, 400);
+            } else {
+                registerForm.style.display = 'block'; setTimeout(() => { registerForm.classList.remove('hidden-form'); }, 50);
+                loginForm.classList.add('hidden-form'); setTimeout(() => { loginForm.style.display = 'none'; }, 400);
+            }
+        }
+    </script>
+</body>
+</html>
