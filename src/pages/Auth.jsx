@@ -16,12 +16,9 @@ const Auth = () => {
       <div style={{ flex: 1, background: 'var(--bg-hero)', display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '60px', position: 'relative', overflow: 'hidden' }}>
         <div style={{ position: 'absolute', top: '20%', right: '10%', width: '300px', height: '300px', background: 'radial-gradient(circle, rgba(96,165,250,.2), transparent 70%)', filter: 'blur(60px)' }}></div>
         <div style={{ position: 'relative', zIndex: 2 }}>
-          <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '48px' }}>
-            <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'linear-gradient(135deg, #3B82F6, #8B5CF6)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <svg width="20" height="20" fill="none" stroke="#fff" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-            </div>
-            <span style={{ color: '#fff', fontWeight: 700, fontSize: '1.2rem', fontFamily: 'var(--font-en)' }}>Pulse</span>
-          </Link>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '48px' }}>
+            <img src="/logo.png" alt="Analytica Logo" style={{ height: '36px', borderRadius: '6px', objectFit: 'contain' }} />
+          </div>
           <h2 style={{ color: '#fff', fontSize: '2rem', marginBottom: '16px', lineHeight: 1.4 }}>حلّل مشاعر جمهورك<br />واتخذ قرارات أذكى</h2>
           <p style={{ color: 'rgba(255,255,255,.5)', fontSize: '1rem', lineHeight: 1.8, maxWidth: '400px' }}>اربط صفحاتك على فيسبوك و X واحصل على تحليلات يومية تلقائية للمنشورات والتعليقات.</p>
 
