@@ -313,7 +313,7 @@ const Landing = () => {
               { title: 'تحويل البيانات إلى قرارات ناجحة', desc: 'نجمع كل هذه التحليلات العميقة ونرتبها أمامك في لوحة تحكم واحدة، بسيطة وواضحة جداً وبألوان ورسوم جذابة ترشدك لاتخاذ القرار الصحيح.', side: 'left', color: '#38BDF8' }
             ].map((step, i) => (
               <div key={i} style={{ display: 'flex', flexDirection: step.side === 'left' ? 'row-reverse' : 'row', alignItems: 'center', marginBottom: '60px', position: 'relative' }}>
-                <div style={{ flex: 1, textAlign: step.side === 'left' ? 'left' : 'right', padding: step.side === 'left' ? '0 0 0 40px' : '0 40px 0 0' }}>
+                <div style={{ flex: 1, textAlign: step.side === 'left' ? 'left' : 'right', padding: step.side === 'left' ? '0 40px 0 0' : '0 0 0 40px' }}>
                   <h3 style={{ fontSize: '1.6rem', color: '#fff', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '12px', flexDirection: step.side === 'left' ? 'row-reverse' : 'row' }}>
                     {step.title}
                     <span className="mono" style={{ color: step.color, fontSize: '1rem', background: `${step.color}20`, padding: '4px 12px', borderRadius: '100px' }}>الخطوة 0{i+1}</span>

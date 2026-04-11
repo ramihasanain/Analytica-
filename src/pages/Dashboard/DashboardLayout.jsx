@@ -6,12 +6,9 @@ const DashboardLayout = () => {
       {/* Sidebar */}
       <aside style={{ width: '260px', background: 'var(--bg-card)', borderLeft: '1px solid var(--border)', display: 'flex', flexDirection: 'column', position: 'fixed', top: 0, right: 0, bottom: 0, zIndex: 50 }}>
         <div style={{ padding: '24px 20px', borderBottom: '1px solid var(--border)' }}>
-          <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'linear-gradient(135deg, #3B82F6, #8B5CF6)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <svg width="16" height="16" fill="none" stroke="#fff" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-            </div>
-            <span style={{ fontWeight: 700, fontSize: '1rem', fontFamily: 'var(--font-en)' }}>Pulse</span>
-          </Link>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <img src="/logo.png" alt="Analytica Logo" style={{ height: '32px', borderRadius: '6px', objectFit: 'contain' }} />
+          </div>
         </div>
 
         <div style={{ padding: '20px 12px', flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
