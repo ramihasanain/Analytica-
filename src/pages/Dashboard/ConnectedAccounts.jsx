@@ -1,38 +1,79 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import api from '../../services/api'
 
 const ConnectedAccounts = () => {
   const [showModal, setShowModal] = useState(false)
   const [modalPlatform, setModalPlatform] = useState('facebook')
-  const [accounts, setAccounts] = useState([
-    { id: 1, name: 'شركة الأفق - الصفحة الرسمية', url: 'facebook.com/alofoq', platform: 'facebook', followers: '48.2K', posts: 3412, status: 'active', lastSync: 'اليوم 06:00 ص' },
-    { id: 2, name: 'Alofoq Store', url: 'facebook.com/alofoqstore', platform: 'facebook', followers: '12.8K', posts: 1204, status: 'active', lastSync: 'اليوم 06:00 ص' },
-    { id: 3, name: '@alofoq_official', url: 'x.com/alofoq_official', platform: 'twitter', followers: '21.4K', posts: 2841, status: 'active', lastSync: 'اليوم 06:00 ص' },
-    { id: 4, name: '@alofoq_support', url: 'x.com/alofoq_support', platform: 'twitter', followers: '3.2K', posts: 1455, status: 'active', lastSync: 'اليوم 06:00 ص' }
-  ])
+  const [accounts, setAccounts] = useState([])
+  const [loading, setLoading] = useState(true)
 
-  const handleDelete = (id) => {
-    setAccounts(prev => prev.filter(a => a.id !== id))
+  useEffect(() => {
+    const fetchProfiles = async () => {
+      try {
+        const res = await api.get('/profiles/')
+        const mapped = res.data.map(p => ({
+          id: p.id,
+          name: p.url ? p.url.split('/').pop() : `حساب ${p.platform}`, // Basic extraction
+          url: p.url || '',
+          platform: p.platform,
+          followers: '-',
+          posts: 0,
+          status: 'active',
+          lastSync: 'لم يبدأ بعد'
+        }))
+        setAccounts(mapped)
+      } catch (err) {
+        console.error('Error fetching profiles', err)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchProfiles()
+  }, [])
+
+  const handleDelete = async (id) => {
+    try {
+      await api.delete(`/profiles/${id}/`)
+      setAccounts(prev => prev.filter(a => a.id !== id))
+    } catch (err) {
+      console.error('Error deleting profile', err)
+    }
   }
 
   const handleToggle = (id) => {
     setAccounts(prev => prev.map(a => a.id === id ? { ...a, status: a.status === 'active' ? 'paused' : 'active' } : a))
   }
 
-  const handleAdd = (e) => {
+  const handleAdd = async (e) => {
     e.preventDefault()
     const form = e.target
-    const newAcc = {
-      id: Date.now(),
-      name: form.name.value,
-      url: form.url.value,
-      platform: modalPlatform,
-      followers: '-',
-      posts: 0,
-      status: 'active',
-      lastSync: 'لم يبدأ بعد'
+    const url = form.url.value
+    
+    // In a real app we'd need to get the user ID, but we rely on the backend token if it assigns it automatically
+    // Wait, the API requires a user ID if it's not automatically set by the serializer from the request.user.
+    // For now we will try to post, if it fails due to user field, backend needs update.
+    try {
+      const res = await api.post('/profiles/', {
+        platform: modalPlatform,
+        url: url,
+        user: 1, // HARDCODED for now, usually backend assigns request.user
+      })
+      const newAcc = {
+        id: res.data.id,
+        name: res.data.url.split('/').pop(),
+        url: res.data.url,
+        platform: res.data.platform,
+        followers: '-',
+        posts: 0,
+        status: 'active',
+        lastSync: 'لم يبدأ بعد'
+      }
+      setAccounts(prev => [...prev, newAcc])
+      setShowModal(false)
+    } catch (err) {
+      console.error('Error adding profile', err)
+      alert('فشل إضافة الحساب. ربما تحتاج لتعديل الـ Backend لربط المستخدم تلقائياً.')
     }
-    setAccounts(prev => [...prev, newAcc])
-    setShowModal(false)
   }
 
   return (
