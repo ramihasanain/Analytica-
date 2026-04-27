@@ -21,18 +21,18 @@ const Posts = () => {
           const engagement = p.engagement_json || {}
           return {
             id: p.id,
-            platform: 'facebook', // Defaulting since profile needs to be fetched or serialized
+            platform: p.platform || 'facebook',
             content: p.content,
             date: p.posted_at ? new Date(p.posted_at).toLocaleString('ar-EG') : 'غير محدد',
-            sentiment: 'محايد', // Defaulting as sentiment is in another model
-            score: 0.5,
+            sentiment: p.sentiment || 'محايد',
+            score: p.score || 0.5,
             lang: p.detected_lang || 'ar',
             likes: engagement.likes || 0,
             shares: engagement.shares || 0,
             type: p.media_type || 'منشور',
-            topic: 'غير محدد',
+            topic: p.topic || 'غير محدد',
             url: '#',
-            comments: [] // No comments model currently
+            comments: [] 
           }
         })
         setPosts(mappedPosts)

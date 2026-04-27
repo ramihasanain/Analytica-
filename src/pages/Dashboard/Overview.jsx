@@ -1,4 +1,30 @@
+import { useState, useEffect } from 'react'
+import api from '../../services/api'
+
 const Overview = () => {
+  const [stats, setStats] = useState(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const res = await api.get('/dashboard-stats/')
+        setStats(res.data)
+      } catch (err) {
+        console.error('Error fetching stats', err)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchStats()
+  }, [])
+
+  if (loading) return <div style={{ padding: '40px', textAlign: 'center' }}>جاري تحميل الإحصائيات...</div>
+  if (!stats) return <div style={{ padding: '40px', textAlign: 'center', color: 'var(--red)' }}>حدث خطأ أثناء تحميل البيانات</div>
+
+  const fbPct = Math.round((stats.platform_distribution.facebook / (stats.total_posts || 1)) * 100)
+  const xPct = 100 - fbPct
+
   return (
     <div>
       {/* Header */}
@@ -18,10 +44,10 @@ const Overview = () => {
       {/* KPI Row 1 */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '16px' }}>
         {[
-          { label: 'إجمالي المنشورات', val: '14,208', change: '+312 هذا الأسبوع', up: true, icon: '📄' },
-          { label: 'إجمالي التعليقات', val: '89,441', change: '+2,104 هذا الأسبوع', up: true, icon: '💬' },
-          { label: 'الصفحات المربوطة', val: '6', change: '3 فيسبوك + 3 X', up: null, icon: '🔗' },
-          { label: 'عمليات السحب المكتملة', val: '184', change: 'آخر 30 يوماً', up: null, icon: '✅' },
+          { label: 'إجمالي المنشورات', val: stats.total_posts.toLocaleString(), change: '+312 هذا الأسبوع', up: true, icon: '📄' },
+          { label: 'إجمالي التعليقات', val: stats.total_comments.toLocaleString(), change: '+2,104 هذا الأسبوع', up: true, icon: '💬' },
+          { label: 'الصفحات المربوطة', val: stats.linked_accounts, change: 'نشط', up: null, icon: '🔗' },
+          { label: 'عمليات السحب المكتملة', val: stats.completed_scrapes, change: 'آخر 30 يوماً', up: null, icon: '✅' },
         ].map((kpi, i) => (
           <div key={i} className="card-flat animate-fade-up" style={{ animationDelay: `${i * .08}s` }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
@@ -39,9 +65,9 @@ const Overview = () => {
       {/* KPI Row 2 - Sentiment Summary */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '32px' }}>
         {[
-          { label: 'مشاعر إيجابية', val: '63.2%', color: 'var(--green)', bg: 'var(--green-light)', width: '63%' },
-          { label: 'مشاعر سلبية', val: '18.5%', color: 'var(--red)', bg: 'var(--red-light)', width: '18%' },
-          { label: 'مشاعر محايدة', val: '18.3%', color: 'var(--amber)', bg: 'var(--amber-light)', width: '18%' },
+          { label: 'مشاعر إيجابية', val: `${stats.sentiment_summary.pos_pct}%`, color: 'var(--green)', bg: 'var(--green-light)', width: `${stats.sentiment_summary.pos_pct}%` },
+          { label: 'مشاعر سلبية', val: `${stats.sentiment_summary.neg_pct}%`, color: 'var(--red)', bg: 'var(--red-light)', width: `${stats.sentiment_summary.neg_pct}%` },
+          { label: 'مشاعر محايدة', val: `${stats.sentiment_summary.neu_pct}%`, color: 'var(--amber)', bg: 'var(--amber-light)', width: `${stats.sentiment_summary.neu_pct}%` },
         ].map((s, i) => (
           <div key={i} className="card-flat animate-fade-up" style={{ animationDelay: `${(i + 4) * .08}s` }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
@@ -69,20 +95,20 @@ const Overview = () => {
             </div>
           </div>
           <div style={{ height: '200px', display: 'flex', alignItems: 'flex-end', gap: '4px' }}>
-            {Array.from({length: 30}).map((_, i) => {
-              const postH = 20 + Math.sin(i * 0.3) * 15 + Math.random() * 25
-              const commentH = postH * (1.5 + Math.random())
+            {stats.timeline.map((d, i) => {
+              const maxVal = Math.max(...stats.timeline.map(x => x.posts)) || 1
+              const heightPct = (d.posts / maxVal) * 100
               return (
-                <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2px', height: '100%', justifyContent: 'flex-end' }}>
-                  <div style={{ height: `${Math.min(commentH * 0.5, 60)}%`, background: 'var(--bg-elevated)', borderRadius: '2px 2px 0 0' }}></div>
-                  <div style={{ height: `${Math.min(postH, 40)}%`, background: 'var(--blue)', borderRadius: '0 0 2px 2px', opacity: .8 }}></div>
+                <div key={i} title={`${d.date}: ${d.posts} منشور`} style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2px', height: '100%', justifyContent: 'flex-end' }}>
+                  <div style={{ height: `${heightPct * 0.4}%`, background: 'var(--bg-elevated)', borderRadius: '2px 2px 0 0' }}></div>
+                  <div style={{ height: `${heightPct}%`, background: 'var(--blue)', borderRadius: '0 0 2px 2px', opacity: .8 }}></div>
                 </div>
               )
             })}
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '12px' }}>
-            <span style={{ fontSize: '.72rem', color: 'var(--text-tertiary)' }}>6 أبريل</span>
-            <span style={{ fontSize: '.72rem', color: 'var(--text-tertiary)' }}>5 مايو</span>
+            <span style={{ fontSize: '.72rem', color: 'var(--text-tertiary)' }}>{stats.timeline[0]?.date}</span>
+            <span style={{ fontSize: '.72rem', color: 'var(--text-tertiary)' }}>{stats.timeline[stats.timeline.length-1]?.date}</span>
           </div>
         </div>
 
@@ -92,8 +118,8 @@ const Overview = () => {
           
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
             {[
-              { name: 'فيسبوك', posts: '9,412', pct: '66%', color: '#1877F2', icon: <svg width="20" height="20" fill="#1877F2" viewBox="0 0 24 24"><path d="M9 8h-3v4h3v12h5v-12h3.642l.358-4h-4v-1.667c0-.955.192-1.333 1.115-1.333h2.885v-5h-3.808c-3.596 0-5.192 1.583-5.192 4.615v3.385z"/></svg> },
-              { name: 'X (تويتر)', posts: '4,796', pct: '34%', color: '#000', icon: <svg width="18" height="18" fill="#000" viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.005 4.15H5.059z"/></svg> },
+              { name: 'فيسبوك', posts: stats.platform_distribution.facebook, pct: `${fbPct}%`, color: '#1877F2', icon: <svg width="20" height="20" fill="#1877F2" viewBox="0 0 24 24"><path d="M9 8h-3v4h3v12h5v-12h3.642l.358-4h-4v-1.667c0-.955.192-1.333 1.115-1.333h2.885v-5h-3.808c-3.596 0-5.192 1.583-5.192 4.615v3.385z"/></svg> },
+              { name: 'X (تويتر)', posts: stats.platform_distribution.twitter, pct: `${xPct}%`, color: '#000', icon: <svg width="18" height="18" fill="#000" viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.005 4.15H5.059z"/></svg> },
             ].map((p, i) => (
               <div key={i}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
@@ -117,19 +143,12 @@ const Overview = () => {
         </div>
       </div>
 
-      {/* Top Topics + Recent Activity */}
+      {/* Top Topics */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
-        {/* Top Topics */}
         <div className="card-flat" style={{ padding: '28px' }}>
           <h3 style={{ fontSize: '1.05rem', marginBottom: '20px' }}>أبرز المواضيع المكتشفة</h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {[
-              { topic: 'خدمة العملاء', count: 1842, sentiment: 'سلبي', badge: 'badge-red' },
-              { topic: 'جودة المنتج', count: 1621, sentiment: 'إيجابي', badge: 'badge-green' },
-              { topic: 'سرعة التوصيل', count: 1204, sentiment: 'سلبي', badge: 'badge-red' },
-              { topic: 'العروض والخصومات', count: 987, sentiment: 'إيجابي', badge: 'badge-green' },
-              { topic: 'سياسة الإرجاع', count: 654, sentiment: 'محايد', badge: 'badge-amber' },
-            ].map((t, i) => (
+            {stats.top_topics.map((t, i) => (
               <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', background: 'var(--bg)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-light)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                   <span className="mono" style={{ fontSize: '.78rem', color: 'var(--text-tertiary)', width: '20px' }}>#{i + 1}</span>
@@ -159,11 +178,8 @@ const Overview = () => {
               </thead>
               <tbody>
                 {[
-                  { platform: 'فيسبوك', status: 'مكتمل', records: '412', date: '05/04', badge: 'badge-green' },
-                  { platform: 'X', status: 'مكتمل', records: '287', date: '05/04', badge: 'badge-green' },
-                  { platform: 'فيسبوك', status: 'مكتمل', records: '398', date: '04/04', badge: 'badge-green' },
-                  { platform: 'X', status: 'فشل', records: '0', date: '04/04', badge: 'badge-red' },
-                  { platform: 'فيسبوك', status: 'مكتمل', records: '445', date: '03/04', badge: 'badge-green' },
+                  { platform: 'فيسبوك', status: 'مكتمل', records: '100', date: 'اليوم', badge: 'badge-green' },
+                  { platform: 'X', status: 'مكتمل', records: '100', date: 'اليوم', badge: 'badge-green' },
                 ].map((job, i) => (
                   <tr key={i}>
                     <td style={{ fontWeight: 700 }}>{job.platform}</td>
