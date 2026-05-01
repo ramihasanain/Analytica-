@@ -1,6 +1,14 @@
+import { useState, useEffect } from 'react'
 import { Link, NavLink, Outlet } from 'react-router-dom'
+import api from '../../services/api'
 
 const DashboardLayout = () => {
+  const [user, setUser] = useState(null)
+
+  useEffect(() => {
+    api.get('/users/me/').then(res => setUser(res.data)).catch(console.error)
+  }, [])
+
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg)' }}>
       {/* Sidebar */}
@@ -40,6 +48,11 @@ const DashboardLayout = () => {
             <span style={{ fontSize: '.72rem', fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '1.5px' }}>النظام</span>
           </div>
 
+          <NavLink to="/dashboard/plans" className={({isActive}) => `sidebar-link ${isActive ? 'active' : ''}`}>
+            <svg className="icon-md" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z" /></svg>
+            الاشتراكات والفوترة
+          </NavLink>
+
           <NavLink to="/dashboard/reports" className={({isActive}) => `sidebar-link ${isActive ? 'active' : ''}`}>
             <svg className="icon-md" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>
             التقارير
@@ -48,10 +61,12 @@ const DashboardLayout = () => {
 
         <div style={{ padding: '16px 20px', borderTop: '1px solid var(--border)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'var(--blue-light)', color: 'var(--blue)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '.85rem' }}>م</div>
+            <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'var(--blue-light)', color: 'var(--blue)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '.85rem' }}>
+              {user ? (user.company_name ? user.company_name[0] : user.username[0].toUpperCase()) : 'م'}
+            </div>
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: '.88rem', fontWeight: 700 }}>محمد أحمد</div>
-              <div style={{ fontSize: '.75rem', color: 'var(--text-tertiary)' }}>الخطة الاحترافية</div>
+              <div style={{ fontSize: '.88rem', fontWeight: 700 }}>{user ? (user.company_name || user.username) : 'جاري التحميل...'}</div>
+              <div style={{ fontSize: '.75rem', color: 'var(--text-tertiary)' }}>{user ? (user.plan_type || 'الخطة الأساسية') : '...'}</div>
             </div>
             <Link to="/" style={{ color: 'var(--text-tertiary)' }}>
               <svg className="icon-sm" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" /></svg>

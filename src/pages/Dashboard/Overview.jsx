@@ -1,9 +1,12 @@
 import { useState, useEffect } from 'react'
 import api from '../../services/api'
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 
 const Overview = () => {
   const [stats, setStats] = useState(null)
+  const [jobs, setJobs] = useState([])
   const [loading, setLoading] = useState(true)
+  const [chartFilter, setChartFilter] = useState('all') // 'all', 'posts', 'comments'
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -16,7 +19,16 @@ const Overview = () => {
         setLoading(false)
       }
     }
+    const fetchJobs = async () => {
+      try {
+        const res = await api.get('/scrape-jobs/')
+        setJobs(res.data.sort((a, b) => new Date(b.started_at || 0) - new Date(a.started_at || 0)).slice(0, 5))
+      } catch (err) {
+        console.error('Error fetching jobs', err)
+      }
+    }
     fetchStats()
+    fetchJobs()
   }, [])
 
   if (loading) return <div style={{ padding: '40px', textAlign: 'center' }}>جاري تحميل الإحصائيات...</div>
@@ -90,25 +102,51 @@ const Overview = () => {
               <p style={{ fontSize: '.82rem' }}>منشورات + تعليقات خلال آخر 30 يوماً</p>
             </div>
             <div style={{ display: 'flex', gap: '8px' }}>
-              <span className="badge badge-blue" style={{ fontSize: '.75rem' }}>منشورات</span>
-              <span className="badge badge-gray" style={{ fontSize: '.75rem' }}>تعليقات</span>
+              <span 
+                className={`badge ${chartFilter === 'all' || chartFilter === 'posts' ? 'badge-blue' : 'badge-gray'}`} 
+                style={{ fontSize: '.75rem', cursor: 'pointer', opacity: chartFilter === 'comments' ? 0.5 : 1 }}
+                onClick={() => setChartFilter(chartFilter === 'posts' ? 'all' : 'posts')}
+              >
+                منشورات
+              </span>
+              <span 
+                className={`badge ${chartFilter === 'all' || chartFilter === 'comments' ? 'badge-gray' : 'badge-gray'}`} 
+                style={{ fontSize: '.75rem', cursor: 'pointer', opacity: chartFilter === 'posts' ? 0.5 : 1, background: chartFilter !== 'posts' ? 'var(--bg-elevated)' : '' }}
+                onClick={() => setChartFilter(chartFilter === 'comments' ? 'all' : 'comments')}
+              >
+                تعليقات
+              </span>
             </div>
           </div>
-          <div style={{ height: '200px', display: 'flex', alignItems: 'flex-end', gap: '4px' }}>
-            {stats.timeline.map((d, i) => {
-              const maxVal = Math.max(...stats.timeline.map(x => x.posts)) || 1
-              const heightPct = (d.posts / maxVal) * 100
-              return (
-                <div key={i} title={`${d.date}: ${d.posts} منشور`} style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2px', height: '100%', justifyContent: 'flex-end' }}>
-                  <div style={{ height: `${heightPct * 0.4}%`, background: 'var(--bg-elevated)', borderRadius: '2px 2px 0 0' }}></div>
-                  <div style={{ height: `${heightPct}%`, background: 'var(--blue)', borderRadius: '0 0 2px 2px', opacity: .8 }}></div>
-                </div>
-              )
-            })}
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '12px' }}>
-            <span style={{ fontSize: '.72rem', color: 'var(--text-tertiary)' }}>{stats.timeline[0]?.date}</span>
-            <span style={{ fontSize: '.72rem', color: 'var(--text-tertiary)' }}>{stats.timeline[stats.timeline.length-1]?.date}</span>
+          <div style={{ height: '240px', width: '100%', marginTop: '16px' }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={stats.timeline} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="colorPosts" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="var(--blue)" stopOpacity={0.4}/>
+                    <stop offset="95%" stopColor="var(--blue)" stopOpacity={0}/>
+                  </linearGradient>
+                  <linearGradient id="colorComments" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#94a3b8" stopOpacity={0.4}/>
+                    <stop offset="95%" stopColor="#94a3b8" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: 'var(--text-tertiary)' }} dy={10} minTickGap={30} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: 'var(--text-tertiary)' }} />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-light)" />
+                <Tooltip 
+                  contentStyle={{ background: 'var(--bg)', borderRadius: '8px', border: '1px solid var(--border)', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
+                  labelStyle={{ color: 'var(--text-secondary)', marginBottom: '4px', fontSize: '0.85rem' }}
+                  itemStyle={{ fontSize: '0.9rem', fontWeight: 600 }}
+                />
+                {(chartFilter === 'all' || chartFilter === 'comments') && (
+                  <Area type="monotone" dataKey="comments" name="تعليقات" stroke="#94a3b8" strokeWidth={3} fillOpacity={1} fill="url(#colorComments)" activeDot={{ r: 6 }} />
+                )}
+                {(chartFilter === 'all' || chartFilter === 'posts') && (
+                  <Area type="monotone" dataKey="posts" name="منشورات" stroke="var(--blue)" strokeWidth={3} fillOpacity={1} fill="url(#colorPosts)" activeDot={{ r: 6 }} />
+                )}
+              </AreaChart>
+            </ResponsiveContainer>
           </div>
         </div>
 
@@ -177,17 +215,19 @@ const Overview = () => {
                 </tr>
               </thead>
               <tbody>
-                {[
-                  { platform: 'فيسبوك', status: 'مكتمل', records: '100', date: 'اليوم', badge: 'badge-green' },
-                  { platform: 'X', status: 'مكتمل', records: '100', date: 'اليوم', badge: 'badge-green' },
-                ].map((job, i) => (
+                {jobs.map((job, i) => (
                   <tr key={i}>
-                    <td style={{ fontWeight: 700 }}>{job.platform}</td>
-                    <td><span className={`badge ${job.badge}`}>{job.status}</span></td>
-                    <td className="mono">{job.records}</td>
-                    <td style={{ color: 'var(--text-secondary)' }}>{job.date}</td>
+                    <td style={{ fontWeight: 700 }}>{job.platform === 'facebook' ? 'فيسبوك' : job.platform === 'twitter' ? 'X' : job.platform}</td>
+                    <td><span className={`badge badge-green`}>{job.status === 'completed' ? 'مكتمل' : job.status}</span></td>
+                    <td className="mono">{job.records_fetched}</td>
+                    <td style={{ color: 'var(--text-secondary)' }}>{job.started_at ? new Date(job.started_at).toLocaleString('ar-EG') : 'غير متوفر'}</td>
                   </tr>
                 ))}
+                {jobs.length === 0 && (
+                  <tr>
+                    <td colSpan="4" style={{ textAlign: 'center', padding: '20px', color: 'var(--text-tertiary)' }}>لا يوجد عمليات سحب سابقة</td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>

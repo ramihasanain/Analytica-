@@ -8,6 +8,8 @@ import Posts from './pages/Dashboard/Posts'
 import SentimentAnalytics from './pages/Dashboard/SentimentAnalytics'
 import ConnectedAccounts from './pages/Dashboard/ConnectedAccounts'
 import Reports from './pages/Dashboard/Reports'
+import OAuthCallback from './pages/Dashboard/OAuthCallback'
+import Plans from './pages/Dashboard/Plans'
 
 function App() {
   return (
@@ -22,7 +24,9 @@ function App() {
           <Route path="sentiment" element={<SentimentAnalytics />} />
           <Route path="accounts" element={<ConnectedAccounts />} />
           <Route path="reports" element={<Reports />} />
+          <Route path="plans" element={<Plans />} />
         </Route>
+        <Route path="/oauth/:platform/callback" element={<OAuthCallback />} />
       </Routes>
     </Router>
   )

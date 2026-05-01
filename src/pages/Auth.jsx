@@ -4,7 +4,7 @@ import api from '../services/api'
 
 const Auth = () => {
   const [isLogin, setIsLogin] = useState(true)
-  const [formData, setFormData] = useState({ username: '', email: '', password: '' })
+  const [formData, setFormData] = useState({ username: '', email: '', password: '', company_name: '', country: '', phone_number: '' })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
@@ -33,7 +33,10 @@ const Auth = () => {
         const res = await api.post('/users/', {
           username: formData.username,
           email: formData.email,
-          password: formData.password
+          password: formData.password,
+          company_name: formData.company_name,
+          country: formData.country,
+          phone_number: formData.phone_number
         })
         // Automatically login after signup (optional)
         const loginRes = await api.post('/token-auth/', {
@@ -98,10 +101,24 @@ const Auth = () => {
              </div>
           )}
           {!isLogin && (
-            <div className="form-group">
-              <label className="form-label">البريد الإلكتروني</label>
-              <input type="email" name="email" value={formData.email} onChange={handleChange} className="form-input" dir="ltr" placeholder="admin@company.com" required />
-            </div>
+            <>
+              <div className="form-group">
+                <label className="form-label">البريد الإلكتروني</label>
+                <input type="email" name="email" value={formData.email} onChange={handleChange} className="form-input" dir="ltr" placeholder="admin@company.com" required />
+              </div>
+              <div className="form-group">
+                <label className="form-label">اسم الشركة</label>
+                <input type="text" name="company_name" value={formData.company_name} onChange={handleChange} className="form-input" placeholder="اسم الشركة" required />
+              </div>
+              <div className="form-group">
+                <label className="form-label">الدولة</label>
+                <input type="text" name="country" value={formData.country} onChange={handleChange} className="form-input" placeholder="الدولة" required />
+              </div>
+              <div className="form-group">
+                <label className="form-label">رقم الهاتف</label>
+                <input type="text" name="phone_number" value={formData.phone_number} onChange={handleChange} className="form-input" dir="ltr" placeholder="رقم الهاتف" required />
+              </div>
+            </>
           )}
           <div className="form-group">
             <label className="form-label">كلمة المرور</label>
