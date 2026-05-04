@@ -10,7 +10,11 @@ const api = axios.create({
 // Request Interceptor to add Token
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('token');
-  if (token) {
+  
+  // Do not attach token for login or signup to prevent 401 on invalid old tokens
+  const isAuthRequest = config.url === '/token-auth/' || (config.url === '/users/' && config.method === 'post');
+  
+  if (token && !isAuthRequest) {
     config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
