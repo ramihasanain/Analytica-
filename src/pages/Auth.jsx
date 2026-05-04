@@ -25,7 +25,8 @@ const Auth = () => {
           username: formData.username,
           password: formData.password
         })
-        localStorage.setItem('token', res.data.token)
+        localStorage.setItem('token', res.data.access)
+        localStorage.setItem('refresh', res.data.refresh)
         navigate('/dashboard')
       } else {
         // Signup (assuming user-list supports POST for registration)
@@ -43,7 +44,8 @@ const Auth = () => {
           username: formData.username,
           password: formData.password
         })
-        localStorage.setItem('token', loginRes.data.token)
+        localStorage.setItem('token', loginRes.data.access)
+        localStorage.setItem('refresh', loginRes.data.refresh)
         navigate('/dashboard')
       }
     } catch (err) {
