@@ -12,7 +12,9 @@ const ConnectedAccounts = () => {
     const fetchProfiles = async () => {
       try {
         const res = await api.get('/profiles/')
-        const mapped = res.data.map(p => ({
+        // Filter profiles to only include Facebook
+        const fbProfiles = res.data.filter(p => p.platform === 'facebook')
+        const mapped = fbProfiles.map(p => ({
           id: p.id,
           name: p.account_name || p.url?.split('/').pop() || `حساب ${p.platform}`,
           url: p.url || '',
@@ -34,7 +36,9 @@ const ConnectedAccounts = () => {
     const fetchJobs = async () => {
       try {
         const res = await api.get('/scrape-jobs/')
-        setJobs(res.data.sort((a, b) => new Date(b.started_at || 0) - new Date(a.started_at || 0)))
+        // Filter jobs to only include Facebook
+        const fbJobs = res.data.filter(job => job.platform === 'facebook')
+        setJobs(fbJobs.sort((a, b) => new Date(b.started_at || 0) - new Date(a.started_at || 0)))
       } catch (err) {
         console.error('Error fetching scrape jobs', err)
       }
@@ -74,7 +78,8 @@ const ConnectedAccounts = () => {
       } : a))
       
       const jobsRes = await api.get('/scrape-jobs/')
-      setJobs(jobsRes.data.sort((a, b) => new Date(b.started_at || 0) - new Date(a.started_at || 0)))
+      const fbJobs = jobsRes.data.filter(job => job.platform === 'facebook')
+      setJobs(fbJobs.sort((a, b) => new Date(b.started_at || 0) - new Date(a.started_at || 0)))
       
     } catch (err) {
       console.error(err)
@@ -101,7 +106,7 @@ const ConnectedAccounts = () => {
       <div style={{ marginBottom: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
           <h1 style={{ fontSize: '1.6rem', marginBottom: '6px' }}>الحسابات المربوطة</h1>
-          <p style={{ fontSize: '.92rem' }}>أضف صفحات فيسبوك أو حسابات X لبدء سحب البيانات تلقائياً كل 24 ساعة</p>
+          <p style={{ fontSize: '.92rem' }}>أضف صفحات فيسبوك لبدء سحب البيانات تلقائياً كل 24 ساعة</p>
         </div>
         <button onClick={() => setShowModal(true)} className="btn btn-blue">
           <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
@@ -160,7 +165,7 @@ const ConnectedAccounts = () => {
               {jobs.slice(0, 5).map((job, i) => (
                 <tr key={i}>
                   <td style={{ fontWeight: 700 }}>{job.profile_name || 'حساب غير معروف'}</td>
-                  <td>{job.platform === 'facebook' ? 'فيسبوك' : job.platform === 'twitter' ? 'X' : job.platform}</td>
+                  <td>فيسبوك</td>
                   <td><span className={`badge badge-green`}>{job.status === 'completed' ? 'مكتمل' : job.status}</span></td>
                   <td className="mono">{job.records_fetched}</td>
                   <td className="mono" style={{ fontSize: '.82rem', color: 'var(--text-secondary)' }}>
@@ -185,16 +190,12 @@ const ConnectedAccounts = () => {
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, backdropFilter: 'blur(4px)' }} onClick={() => setShowModal(false)}>
           <div style={{ background: '#fff', borderRadius: 'var(--radius-lg)', padding: '40px', width: '480px', boxShadow: 'var(--shadow-xl)' }} onClick={e => e.stopPropagation()}>
             <h2 style={{ fontSize: '1.4rem', marginBottom: '8px' }}>ربط حساب جديد</h2>
-            <p style={{ fontSize: '.9rem', color: 'var(--text-secondary)', marginBottom: '28px' }}>اختر المنصة التي تريد ربطها لسحب البيانات تلقائياً بصورة آمنة</p>
+            <p style={{ fontSize: '.9rem', color: 'var(--text-secondary)', marginBottom: '28px' }}>قم بربط صفحة الفيسبوك الخاصة بك لسحب المنشورات والتعليقات بصورة آمنة وتلقائية.</p>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '32px' }}>
               <button type="button" onClick={() => handleConnect('facebook')} style={{ padding: '16px', border: '1.5px solid var(--border)', borderRadius: 'var(--radius-sm)', background: '#EFF6FF', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontWeight: 700, fontSize: '1rem', fontFamily: 'var(--font-ar)', color: '#1877F2' }}>
                 <svg width="24" height="24" fill="#1877F2" viewBox="0 0 24 24"><path d="M9 8h-3v4h3v12h5v-12h3.642l.358-4h-4v-1.667c0-.955.192-1.333 1.115-1.333h2.885v-5h-3.808c-3.596 0-5.192 1.583-5.192 4.615v3.385z"/></svg>
                 ربط حساب فيسبوك (OAuth رسمي)
-              </button>
-              <button type="button" onClick={() => handleConnect('x')} style={{ padding: '16px', border: '1.5px solid var(--border)', borderRadius: 'var(--radius-sm)', background: 'var(--bg-elevated)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontWeight: 700, fontSize: '1rem', fontFamily: 'var(--font-ar)', color: '#000' }}>
-                <svg width="20" height="20" fill="#000" viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.005 4.15H5.059z"/></svg>
-                ربط حساب X (OAuth رسمي)
               </button>
             </div>
 
@@ -211,13 +212,11 @@ const ConnectedAccounts = () => {
 const AccountCard = ({ acc, onDelete, onToggle, onSync, isSyncing }) => (
   <div className="card-flat animate-fade-up" style={{ position: 'relative' }}>
     <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '18px' }}>
-      <div style={{ width: '42px', height: '42px', borderRadius: '10px', background: acc.platform === 'facebook' ? '#EFF6FF' : 'var(--bg-elevated)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+      <div style={{ width: '42px', height: '42px', borderRadius: '10px', background: '#EFF6FF', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
         {acc.profile_picture_url ? (
             <img src={acc.profile_picture_url} alt={acc.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-        ) : acc.platform === 'facebook' ? (
-          <svg width="22" height="22" fill="#1877F2" viewBox="0 0 24 24"><path d="M9 8h-3v4h3v12h5v-12h3.642l.358-4h-4v-1.667c0-.955.192-1.333 1.115-1.333h2.885v-5h-3.808c-3.596 0-5.192 1.583-5.192 4.615v3.385z"/></svg>
         ) : (
-          <svg width="20" height="20" fill="#000" viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.005 4.15H5.059z"/></svg>
+          <svg width="22" height="22" fill="#1877F2" viewBox="0 0 24 24"><path d="M9 8h-3v4h3v12h5v-12h3.642l.358-4h-4v-1.667c0-.955.192-1.333 1.115-1.333h2.885v-5h-3.808c-3.596 0-5.192 1.583-5.192 4.615v3.385z"/></svg>
         )}
       </div>
       <div style={{ flex: 1 }}>

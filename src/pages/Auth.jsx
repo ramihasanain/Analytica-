@@ -2,6 +2,61 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import api from '../services/api'
 
+const passwordCriteria = (password) => {
+  if (!password) return {
+    length: false,
+    lowercase: false,
+    uppercase: false,
+    number: false,
+    special: false,
+    noSequence: false,
+    isValid: false,
+    strength: 0,
+  }
+
+  const length = password.length >= 8
+  const lowercase = /[a-z]/.test(password)
+  const uppercase = /[A-Z]/.test(password)
+  const number = /\d/.test(password)
+  const special = /[@$!%*?&#^()_\-+={[\]}|:;\"'<>,./?`~]/.test(password)
+  
+  const uniqueChars = new Set(password).size
+  const isTooRepetitive = password.length >= 5 && uniqueChars <= 2
+
+  const digits = password.replace(/\D/g, '')
+  let hasSequence = false
+  if (digits.length >= 5) {
+    for (let i = 0; i <= digits.length - 5; i++) {
+      const seq = digits.slice(i, i + 5)
+      if ("01234567890".includes(seq) || "98765432109".includes(seq)) {
+        hasSequence = true
+        break
+      }
+    }
+  }
+  const noSequence = !isTooRepetitive && !hasSequence
+
+  let score = 0
+  if (length) score++
+  if (lowercase && uppercase) score++
+  if (number) score++
+  if (special) score++
+  if (noSequence && password.length >= 8) score++
+
+  const isValid = length && lowercase && uppercase && number && special && noSequence
+
+  return {
+    length,
+    lowercase,
+    uppercase,
+    number,
+    special,
+    noSequence,
+    isValid,
+    strength: Math.min(score, 5)
+  }
+}
+
 const Auth = () => {
   const [isLogin, setIsLogin] = useState(true)
   const [formData, setFormData] = useState({ username: '', email: '', password: '', company_name: '', country: '', phone_number: '' })
@@ -16,6 +71,15 @@ const Auth = () => {
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
+    
+    if (!isLogin) {
+      const val = passwordCriteria(formData.password)
+      if (!val.isValid) {
+        setError('يرجى التأكد من استيفاء جميع شروط كلمة المرور المعقدة قبل المتابعة.')
+        return
+      }
+    }
+
     setLoading(true)
 
     try {
@@ -125,6 +189,76 @@ const Auth = () => {
           <div className="form-group">
             <label className="form-label">كلمة المرور</label>
             <input type="password" name="password" value={formData.password} onChange={handleChange} className="form-input" dir="ltr" placeholder="••••••••" required />
+            
+            {!isLogin && formData.password && (() => {
+              const pwValidation = passwordCriteria(formData.password);
+              return (
+                <div style={{ marginTop: '12px', fontSize: '.85rem', direction: 'rtl', textAlign: 'right', animation: 'fadeIn 0.3s ease' }}>
+                  {/* Strength Meter Bar */}
+                  <div style={{ display: 'flex', gap: '4px', marginBottom: '8px', height: '4px' }}>
+                    {[1, 2, 3, 4, 5].map((level) => {
+                      const active = pwValidation.strength >= level;
+                      let color = 'var(--border)';
+                      if (active) {
+                        if (pwValidation.strength <= 2) color = 'var(--red)';
+                        else if (pwValidation.strength <= 4) color = 'var(--amber)';
+                        else color = 'var(--green)';
+                      }
+                      return (
+                        <div 
+                          key={level} 
+                          style={{ 
+                            flex: 1, 
+                            background: color, 
+                            borderRadius: '2px',
+                            transition: 'background 0.3s ease'
+                          }} 
+                        />
+                      );
+                    })}
+                  </div>
+                  
+                  {/* Strength Text Indicator */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>قوة كلمة المرور:</span>
+                    <span style={{ 
+                      fontWeight: 700,
+                      color: pwValidation.strength <= 2 ? 'var(--red)' : pwValidation.strength <= 4 ? 'var(--amber)' : 'var(--green)'
+                    }}>
+                      {pwValidation.strength <= 2 ? 'ضعيفة' : pwValidation.strength <= 4 ? 'متوسطة' : 'قوية جداً'}
+                    </span>
+                  </div>
+                  
+                  {/* Checklist */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', background: 'var(--bg-elevated)', padding: '10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: pwValidation.length ? 'var(--green)' : 'var(--text-secondary)', transition: 'color 0.2s' }}>
+                      <span style={{ fontWeight: 'bold' }}>{pwValidation.length ? '✓' : '○'}</span>
+                      <span>8 رموز على الأقل</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: pwValidation.lowercase ? 'var(--green)' : 'var(--text-secondary)', transition: 'color 0.2s' }}>
+                      <span style={{ fontWeight: 'bold' }}>{pwValidation.lowercase ? '✓' : '○'}</span>
+                      <span>حروف صغيرة (a-z)</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: pwValidation.uppercase ? 'var(--green)' : 'var(--text-secondary)', transition: 'color 0.2s' }}>
+                      <span style={{ fontWeight: 'bold' }}>{pwValidation.uppercase ? '✓' : '○'}</span>
+                      <span>حروف كبيرة (A-Z)</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: pwValidation.number ? 'var(--green)' : 'var(--text-secondary)', transition: 'color 0.2s' }}>
+                      <span style={{ fontWeight: 'bold' }}>{pwValidation.number ? '✓' : '○'}</span>
+                      <span>أرقام (0-9)</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: pwValidation.special ? 'var(--green)' : 'var(--text-secondary)', transition: 'color 0.2s' }}>
+                      <span style={{ fontWeight: 'bold' }}>{pwValidation.special ? '✓' : '○'}</span>
+                      <span>رموز خاصة (@، !، $)</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: pwValidation.noSequence ? 'var(--green)' : 'var(--text-secondary)', transition: 'color 0.2s' }}>
+                      <span style={{ fontWeight: 'bold' }}>{pwValidation.noSequence ? '✓' : '○'}</span>
+                      <span>أرقام غير متسلسلة عادية</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
           <button type="submit" className="btn btn-dark" disabled={loading} style={{ width: '100%', padding: '14px', fontSize: '1rem', marginTop: '8px', opacity: loading ? 0.7 : 1 }}>
             {loading ? 'جاري التحميل...' : (isLogin ? 'تسجيل الدخول' : 'إنشاء الحساب')}

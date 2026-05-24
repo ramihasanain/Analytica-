@@ -22,7 +22,8 @@ const Overview = () => {
     const fetchJobs = async () => {
       try {
         const res = await api.get('/scrape-jobs/')
-        setJobs(res.data.sort((a, b) => new Date(b.started_at || 0) - new Date(a.started_at || 0)).slice(0, 5))
+        const fbJobs = res.data.filter(job => job.platform === 'facebook')
+        setJobs(fbJobs.sort((a, b) => new Date(b.started_at || 0) - new Date(a.started_at || 0)).slice(0, 5))
       } catch (err) {
         console.error('Error fetching jobs', err)
       }
@@ -34,8 +35,7 @@ const Overview = () => {
   if (loading) return <div style={{ padding: '40px', textAlign: 'center' }}>جاري تحميل الإحصائيات...</div>
   if (!stats) return <div style={{ padding: '40px', textAlign: 'center', color: 'var(--red)' }}>حدث خطأ أثناء تحميل البيانات</div>
 
-  const fbPct = Math.round((stats.platform_distribution.facebook / (stats.total_posts || 1)) * 100)
-  const xPct = 100 - fbPct
+  const fbPct = 100
 
   return (
     <div>
@@ -156,8 +156,7 @@ const Overview = () => {
           
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
             {[
-              { name: 'فيسبوك', posts: stats.platform_distribution.facebook, pct: `${fbPct}%`, color: '#1877F2', icon: <svg width="20" height="20" fill="#1877F2" viewBox="0 0 24 24"><path d="M9 8h-3v4h3v12h5v-12h3.642l.358-4h-4v-1.667c0-.955.192-1.333 1.115-1.333h2.885v-5h-3.808c-3.596 0-5.192 1.583-5.192 4.615v3.385z"/></svg> },
-              { name: 'X (تويتر)', posts: stats.platform_distribution.twitter, pct: `${xPct}%`, color: '#000', icon: <svg width="18" height="18" fill="#000" viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.005 4.15H5.059z"/></svg> },
+              { name: 'فيسبوك', posts: stats.platform_distribution.facebook, pct: '100%', color: '#1877F2', icon: <svg width="20" height="20" fill="#1877F2" viewBox="0 0 24 24"><path d="M9 8h-3v4h3v12h5v-12h3.642l.358-4h-4v-1.667c0-.955.192-1.333 1.115-1.333h2.885v-5h-3.808c-3.596 0-5.192 1.583-5.192 4.615v3.385z"/></svg> },
             ].map((p, i) => (
               <div key={i}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
@@ -217,7 +216,7 @@ const Overview = () => {
               <tbody>
                 {jobs.map((job, i) => (
                   <tr key={i}>
-                    <td style={{ fontWeight: 700 }}>{job.platform === 'facebook' ? 'فيسبوك' : job.platform === 'twitter' ? 'X' : job.platform}</td>
+                    <td style={{ fontWeight: 700 }}>فيسبوك</td>
                     <td><span className={`badge badge-green`}>{job.status === 'completed' ? 'مكتمل' : job.status}</span></td>
                     <td className="mono">{job.records_fetched}</td>
                     <td style={{ color: 'var(--text-secondary)' }}>{job.started_at ? new Date(job.started_at).toLocaleString('ar-EG') : 'غير متوفر'}</td>
