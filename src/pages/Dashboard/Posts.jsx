@@ -508,7 +508,6 @@ const Posts = () => {
                                         ` ${(comment.score * 100).toFixed(0)}%`
                                       )}
                                     </span>
-                                    <span style={{ fontSize: '.75rem', color: 'var(--text-tertiary)', fontWeight: 600 }}>{comment.topic}</span>
                                     <span className="badge badge-gray" style={{ fontSize: '.65rem', padding: '2px 6px', opacity: 0.8 }}>
                                       {comment.engine_used && (comment.engine_used.toLowerCase().includes('gemini') || comment.engine_used.toLowerCase().includes('ai')) ? (
                                         '🧠 AI'
