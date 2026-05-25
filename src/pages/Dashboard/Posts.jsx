@@ -16,6 +16,25 @@ const Posts = () => {
   const [expandedPost, setExpandedPost] = useState(null)
   const [expandedPostData, setExpandedPostData] = useState({})
   const { lang, isRTL } = useLanguage()
+  const [isClassifyingTopics, setIsClassifyingTopics] = useState(false)
+  const [aiTopicsMessage, setAiTopicsMessage] = useState('')
+  
+  const handleBatchAITopics = async () => {
+    setIsClassifyingTopics(true)
+    setAiTopicsMessage('')
+    try {
+      const res = await api.post('/posts/batch-ai-topics/')
+      setAiTopicsMessage(res.data.message)
+      fetchPostsAndProfiles(false)
+      setTimeout(() => setAiTopicsMessage(''), 8000)
+    } catch (err) {
+      console.error(err)
+      const errorMsg = err.response?.data?.error || (lang === 'ar' ? 'فشل تصنيف المواضيع بالذكاء الاصطناعي' : 'Failed to classify topics with AI')
+      alert(errorMsg)
+    } finally {
+      setIsClassifyingTopics(false)
+    }
+  }
   
   // Real-time automatic background analysis tracking state
   const [analysisStats, setAnalysisStats] = useState({ total: 0, analyzed: 0, percentage: 100 })
@@ -323,10 +342,64 @@ const Posts = () => {
               ))}
             </select>
 
+            {/* Batch AI Topic Button */}
+            <button
+              onClick={handleBatchAITopics}
+              disabled={isClassifyingTopics}
+              style={{
+                padding: '9px 16px',
+                borderRadius: 'var(--radius-sm)',
+                fontWeight: 600,
+                fontSize: '.85rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                background: 'linear-gradient(135deg, #7c3aed 0%, #2563eb 100%)',
+                color: '#fff',
+                border: 'none',
+                cursor: 'pointer',
+                opacity: isClassifyingTopics ? 0.7 : 1,
+                boxShadow: '0 4px 12px rgba(124, 58, 237, 0.15)',
+                outline: 'none'
+              }}
+            >
+              {isClassifyingTopics ? (
+                <>
+                  <span className="spinner" style={{ width: '14px', height: '14px', border: '2px solid #fff', borderTopColor: 'transparent', borderRadius: '50%', display: 'inline-block', animation: 'spin 1s linear infinite' }}></span>
+                  <span>{lang === 'ar' ? 'جاري التصنيف بالـ AI...' : 'Classifying with AI...'}</span>
+                </>
+              ) : (
+                <>
+                  <span>🧠</span>
+                  <span>{lang === 'ar' ? 'تصنيف المواضيع بالـ AI' : 'Classify Topics with AI'}</span>
+                </>
+              )}
+            </button>
+
             <span className="badge badge-gray" style={{ marginInlineStart: isRTL ? 'auto' : '0', marginInlineEnd: !isRTL ? 'auto' : '0' }}>
               {filtered.length} {lang === 'ar' ? 'نتيجة' : 'results'}
             </span>
           </div>
+
+          {aiTopicsMessage && (
+            <div style={{ 
+              background: 'rgba(16, 185, 129, 0.05)', 
+              color: 'var(--green)', 
+              border: '1px solid rgba(16, 185, 129, 0.2)', 
+              padding: '12px 18px', 
+              borderRadius: '8px', 
+              marginBottom: '20px', 
+              fontSize: '.9rem',
+              fontWeight: 600,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              animation: 'fadeIn 0.3s'
+            }}>
+              <span>✅</span>
+              <span>{aiTopicsMessage}</span>
+            </div>
+          )}
 
           {/* Posts List */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
