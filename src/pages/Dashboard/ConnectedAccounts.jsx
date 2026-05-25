@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import api from '../../services/api'
+import { useLanguage } from '../../LanguageContext'
 
 const ConnectedAccounts = () => {
   const [showModal, setShowModal] = useState(false)
@@ -7,6 +8,7 @@ const ConnectedAccounts = () => {
   const [accounts, setAccounts] = useState([])
   const [loading, setLoading] = useState(true)
   const [jobs, setJobs] = useState([])
+  const { t, lang, isRTL } = useLanguage()
 
   useEffect(() => {
     const fetchProfiles = async () => {
@@ -22,7 +24,7 @@ const ConnectedAccounts = () => {
           followers: p.followers_count || 0,
           posts: p.posts_count || 0,
           status: 'active',
-          lastSync: 'لم يبدأ بعد',
+          lastSync: 'Live ● Connected',
           profile_picture_url: p.profile_picture_url || ''
         }))
         setAccounts(mapped)
@@ -67,14 +69,14 @@ const ConnectedAccounts = () => {
     setSyncingId(id)
     try {
       const res = await api.post(`/profiles/${id}/sync/`)
-      alert(res.data.message || 'تمت المزامنة بنجاح!')
+      alert(res.data.message || t('caSyncSuccess'))
       setAccounts(prev => prev.map(a => a.id === id ? {
         ...a,
         name: res.data.profile.account_name || a.name,
         followers: res.data.profile.followers_count || a.followers,
         posts: res.data.profile.posts_count || a.posts,
         profile_picture_url: res.data.profile.profile_picture_url || a.profile_picture_url,
-        lastSync: 'الآن'
+        lastSync: 'Live ● Connected'
       } : a))
       
       const jobsRes = await api.get('/scrape-jobs/')
@@ -83,7 +85,7 @@ const ConnectedAccounts = () => {
       
     } catch (err) {
       console.error(err)
-      alert(err.response?.data?.error || 'فشلت عملية المزامنة')
+      alert(err.response?.data?.error || t('caSyncFailed'))
     } finally {
       setSyncingId(null)
     }
@@ -101,29 +103,31 @@ const ConnectedAccounts = () => {
     }
   }
 
+  if (loading) return <div style={{ padding: '40px', textAlign: 'center', fontFamily: isRTL ? 'var(--font-ar)' : 'var(--font-en)' }}>{t('dbLoading')}</div>
+
   return (
-    <div>
-      <div style={{ marginBottom: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+    <div style={{ fontFamily: isRTL ? 'var(--font-ar)' : 'var(--font-en)', direction: isRTL ? 'rtl' : 'ltr', textAlign: isRTL ? 'right' : 'left' }}>
+      <div style={{ marginBottom: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexDirection: isRTL ? 'row' : 'row-reverse' }}>
         <div>
-          <h1 style={{ fontSize: '1.6rem', marginBottom: '6px' }}>الحسابات المربوطة</h1>
-          <p style={{ fontSize: '.92rem' }}>أضف صفحات فيسبوك لبدء سحب البيانات تلقائياً كل 24 ساعة</p>
+          <h1 style={{ fontSize: '1.6rem', marginBottom: '6px' }}>{t('caTitle')}</h1>
+          <p style={{ fontSize: '.92rem', color: 'var(--text-secondary)' }}>{t('caSubtitle')}</p>
         </div>
         <button onClick={() => setShowModal(true)} className="btn btn-blue">
           <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
-          ربط حساب جديد
+          {t('caConnectNew')}
         </button>
       </div>
 
       {/* Summary Stats */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '32px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px', marginBottom: '32px' }}>
         {[
-          { label: 'إجمالي الحسابات', val: accounts.length, icon: '🔗' },
-          { label: 'حسابات نشطة', val: accounts.filter(a => a.status === 'active').length, icon: '✅' },
-          { label: 'حسابات متوقفة', val: accounts.filter(a => a.status === 'paused').length, icon: '⏸️' },
-          { label: 'إجمالي المنشورات المسحوبة', val: accounts.reduce((sum, a) => sum + a.posts, 0).toLocaleString(), icon: '📄' },
+          { label: t('caTotalAccounts'), val: accounts.length, icon: '🔗' },
+          { label: t('caActiveAccounts'), val: accounts.filter(a => a.status === 'active').length, icon: '✅' },
+          { label: t('caPausedAccounts'), val: accounts.filter(a => a.status === 'paused').length, icon: '⏸️' },
+          { label: t('caTotalPosts'), val: accounts.reduce((sum, a) => sum + a.posts, 0).toLocaleString(), icon: '📄' },
         ].map((s, i) => (
-          <div key={i} className="card-flat">
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+          <div key={i} className="card-flat animate-fade-up" style={{ animationDelay: `${i * .08}s`, textAlign: isRTL ? 'right' : 'left' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', flexDirection: isRTL ? 'row' : 'row-reverse' }}>
               <span style={{ fontSize: '.82rem', color: 'var(--text-secondary)', fontWeight: 600 }}>{s.label}</span>
               <span>{s.icon}</span>
             </div>
@@ -134,50 +138,50 @@ const ConnectedAccounts = () => {
 
       {/* My Accounts */}
       <div style={{ marginBottom: '40px' }}>
-        <h3 style={{ fontSize: '1.1rem', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-          🏢 حساباتي
+        <h3 style={{ fontSize: '1.1rem', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px', flexDirection: isRTL ? 'row' : 'row-reverse' }}>
+          <span>{t('caMyAccounts')}</span>
           <span className="badge badge-gray">{accounts.length}</span>
         </h3>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '16px' }}>
           {accounts.map(acc => (
-            <AccountCard key={acc.id} acc={acc} onDelete={handleDelete} onToggle={handleToggle} onSync={handleSync} isSyncing={syncingId === acc.id} />
+            <AccountCard key={acc.id} acc={acc} onDelete={handleDelete} onToggle={handleToggle} onSync={handleSync} isSyncing={syncingId === acc.id} t={t} isRTL={isRTL} lang={lang} />
           ))}
         </div>
       </div>
 
       {/* Scrape History */}
       <div className="card-flat" style={{ padding: '28px' }}>
-        <h3 style={{ fontSize: '1.05rem', marginBottom: '20px' }}>سجل عمليات السحب الأخيرة</h3>
+        <h3 style={{ fontSize: '1.05rem', marginBottom: '20px' }}>{t('caScrapeHistory')}</h3>
         <div className="table-wrap">
-          <table className="data-table">
+          <table className="data-table" style={{ direction: isRTL ? 'rtl' : 'ltr' }}>
             <thead>
-              <tr>
-                <th>الحساب</th>
-                <th>المنصة</th>
-                <th>الحالة</th>
-                <th>سجلات</th>
-                <th>بدأ في</th>
-                <th>انتهى في</th>
-                <th>المدة</th>
+              <tr style={{ flexDirection: isRTL ? 'row' : 'row-reverse' }}>
+                <th style={{ textAlign: isRTL ? 'right' : 'left' }}>{t('caTableAccount')}</th>
+                <th style={{ textAlign: isRTL ? 'right' : 'left' }}>{t('caTablePlatform')}</th>
+                <th style={{ textAlign: isRTL ? 'right' : 'left' }}>{t('caTableStatus')}</th>
+                <th style={{ textAlign: isRTL ? 'right' : 'left' }}>{t('caTableRecords')}</th>
+                <th style={{ textAlign: isRTL ? 'right' : 'left' }}>{t('caTableStartedAt')}</th>
+                <th style={{ textAlign: isRTL ? 'right' : 'left' }}>{t('caTableFinishedAt')}</th>
+                <th style={{ textAlign: isRTL ? 'right' : 'left' }}>{t('caTableDuration')}</th>
               </tr>
             </thead>
             <tbody>
               {jobs.slice(0, 5).map((job, i) => (
                 <tr key={i}>
-                  <td style={{ fontWeight: 700 }}>{job.profile_name || 'حساب غير معروف'}</td>
-                  <td>فيسبوك</td>
-                  <td><span className={`badge badge-green`}>{job.status === 'completed' ? 'مكتمل' : job.status}</span></td>
+                  <td style={{ fontWeight: 700 }}>{job.profile_name || '—'}</td>
+                  <td>{t('caPlatformFB')}</td>
+                  <td><span className={`badge badge-green`}>{job.status === 'completed' ? t('caJobCompleted') : job.status}</span></td>
                   <td className="mono">{job.records_fetched}</td>
                   <td className="mono" style={{ fontSize: '.82rem', color: 'var(--text-secondary)' }}>
-                    {job.started_at ? new Date(job.started_at).toLocaleString('ar-EG') : 'غير متوفر'}
+                    {job.started_at ? new Date(job.started_at).toLocaleString(lang === 'ar' ? 'ar-EG' : 'en-US') : t('caNotAvailable')}
                   </td>
-                  <td className="mono" style={{ fontSize: '.82rem', color: 'var(--text-secondary)' }}>--</td>
-                  <td className="mono" style={{ fontWeight: 700 }}>--</td>
+                  <td className="mono" style={{ fontSize: '.82rem', color: 'var(--text-secondary)' }}>—</td>
+                  <td className="mono" style={{ fontWeight: 700 }}>—</td>
                 </tr>
               ))}
               {jobs.length === 0 && (
                 <tr>
-                  <td colSpan="7" style={{ textAlign: 'center', padding: '20px', color: 'var(--text-tertiary)' }}>لا يوجد عمليات سحب سابقة</td>
+                  <td colSpan="7" style={{ textAlign: 'center', padding: '20px', color: 'var(--text-tertiary)' }}>{t('caNoJobs')}</td>
                 </tr>
               )}
             </tbody>
@@ -188,19 +192,19 @@ const ConnectedAccounts = () => {
       {/* Add Account Modal */}
       {showModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, backdropFilter: 'blur(4px)' }} onClick={() => setShowModal(false)}>
-          <div style={{ background: '#fff', borderRadius: 'var(--radius-lg)', padding: '40px', width: '480px', boxShadow: 'var(--shadow-xl)' }} onClick={e => e.stopPropagation()}>
-            <h2 style={{ fontSize: '1.4rem', marginBottom: '8px' }}>ربط حساب جديد</h2>
-            <p style={{ fontSize: '.9rem', color: 'var(--text-secondary)', marginBottom: '28px' }}>قم بربط صفحة الفيسبوك الخاصة بك لسحب المنشورات والتعليقات بصورة آمنة وتلقائية.</p>
+          <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '40px', width: '480px', boxShadow: 'var(--shadow-xl)', textAlign: isRTL ? 'right' : 'left' }} onClick={e => e.stopPropagation()}>
+            <h2 style={{ fontSize: '1.4rem', marginBottom: '8px' }}>{t('caConnectNew')}</h2>
+            <p style={{ fontSize: '.9rem', color: 'var(--text-secondary)', marginBottom: '28px' }}>{t('caModalDesc')}</p>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '32px' }}>
-              <button type="button" onClick={() => handleConnect('facebook')} style={{ padding: '16px', border: '1.5px solid var(--border)', borderRadius: 'var(--radius-sm)', background: '#EFF6FF', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontWeight: 700, fontSize: '1rem', fontFamily: 'var(--font-ar)', color: '#1877F2' }}>
+              <button type="button" onClick={() => handleConnect('facebook')} style={{ padding: '16px', border: '1.5px solid var(--border)', borderRadius: 'var(--radius-sm)', background: 'rgba(24, 119, 242, 0.08)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontWeight: 700, fontSize: '1rem', fontFamily: isRTL ? 'var(--font-ar)' : 'var(--font-en)', color: '#1877F2', width: '100%' }}>
                 <svg width="24" height="24" fill="#1877F2" viewBox="0 0 24 24"><path d="M9 8h-3v4h3v12h5v-12h3.642l.358-4h-4v-1.667c0-.955.192-1.333 1.115-1.333h2.885v-5h-3.808c-3.596 0-5.192 1.583-5.192 4.615v3.385z"/></svg>
-                ربط حساب فيسبوك (OAuth رسمي)
+                {t('caConnectFB')}
               </button>
             </div>
 
             <div style={{ display: 'flex', gap: '12px' }}>
-              <button type="button" onClick={() => setShowModal(false)} className="btn btn-outline" style={{ flex: 1, padding: '14px 24px' }}>إلغاء</button>
+              <button type="button" onClick={() => setShowModal(false)} className="btn btn-outline" style={{ flex: 1, padding: '14px 24px' }}>{t('caCancel')}</button>
             </div>
           </div>
         </div>
@@ -209,48 +213,51 @@ const ConnectedAccounts = () => {
   )
 }
 
-const AccountCard = ({ acc, onDelete, onToggle, onSync, isSyncing }) => (
-  <div className="card-flat animate-fade-up" style={{ position: 'relative' }}>
-    <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '18px' }}>
-      <div style={{ width: '42px', height: '42px', borderRadius: '10px', background: '#EFF6FF', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+const AccountCard = ({ acc, onDelete, onToggle, onSync, isSyncing, t, isRTL, lang }) => (
+  <div className="card-flat animate-fade-up" style={{ position: 'relative', textAlign: isRTL ? 'right' : 'left' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '18px', flexDirection: isRTL ? 'row' : 'row-reverse' }}>
+      <div style={{ width: '42px', height: '42px', borderRadius: '10px', background: 'rgba(24, 119, 242, 0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
         {acc.profile_picture_url ? (
-            <img src={acc.profile_picture_url} alt={acc.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          <img src={acc.profile_picture_url} alt={acc.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
         ) : (
           <svg width="22" height="22" fill="#1877F2" viewBox="0 0 24 24"><path d="M9 8h-3v4h3v12h5v-12h3.642l.358-4h-4v-1.667c0-.955.192-1.333 1.115-1.333h2.885v-5h-3.808c-3.596 0-5.192 1.583-5.192 4.615v3.385z"/></svg>
         )}
       </div>
       <div style={{ flex: 1 }}>
         <div style={{ fontWeight: 700, fontSize: '.95rem', marginBottom: '2px' }}>{acc.name}</div>
-        <div className="mono" style={{ fontSize: '.78rem', color: 'var(--text-tertiary)' }}>{acc.url}</div>
+        <div className="mono" style={{ fontSize: '.78rem', color: 'var(--text-tertiary)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', maxWidth: '180px' }}>{acc.url}</div>
       </div>
       <span className={`badge ${acc.status === 'active' ? 'badge-green' : 'badge-amber'}`}>
-        {acc.status === 'active' ? 'نشط' : 'متوقف'}
+        {acc.status === 'active' ? t('caStatusActive') : t('caStatusPaused')}
       </span>
     </div>
 
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', padding: '14px', background: 'var(--bg)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-light)', marginBottom: '16px' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', padding: '14px', background: 'var(--bg)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-light)', marginBottom: '16px', direction: isRTL ? 'rtl' : 'ltr' }}>
       <div>
-        <div style={{ fontSize: '.75rem', color: 'var(--text-tertiary)', marginBottom: '4px' }}>المتابعون</div>
+        <div style={{ fontSize: '.75rem', color: 'var(--text-tertiary)', marginBottom: '4px' }}>{t('caFollowers')}</div>
         <div className="mono" style={{ fontWeight: 700, fontSize: '.9rem' }}>{acc.followers}</div>
       </div>
       <div>
-        <div style={{ fontSize: '.75rem', color: 'var(--text-tertiary)', marginBottom: '4px' }}>منشورات مسحوبة</div>
+        <div style={{ fontSize: '.75rem', color: 'var(--text-tertiary)', marginBottom: '4px' }}>{t('caPosts')}</div>
         <div className="mono" style={{ fontWeight: 700, fontSize: '.9rem' }}>{acc.posts.toLocaleString()}</div>
       </div>
       <div>
-        <div style={{ fontSize: '.75rem', color: 'var(--text-tertiary)', marginBottom: '4px' }}>آخر سحب</div>
-        <div style={{ fontWeight: 700, fontSize: '.82rem' }}>{acc.lastSync}</div>
+        <div style={{ fontSize: '.75rem', color: 'var(--text-tertiary)', marginBottom: '4px' }}>{t('caLastSync')}</div>
+        <div style={{ fontWeight: 700, fontSize: '.82rem', color: 'var(--green)', display: 'flex', alignItems: 'center', gap: '4px', justifyContent: isRTL ? 'flex-start' : 'flex-end' }}>
+          <span className="breathing-dot" style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--green)', boxShadow: '0 0 6px var(--green)', display: 'inline-block' }}></span>
+          {t('caNotStarted')}
+        </div>
       </div>
     </div>
 
-    <div style={{ display: 'flex', gap: '8px' }}>
+    <div style={{ display: 'flex', gap: '8px', flexDirection: isRTL ? 'row' : 'row-reverse' }}>
       <button onClick={() => onSync(acc.id)} disabled={isSyncing} className="btn btn-blue" style={{ fontSize: '.82rem', flex: 1, display: 'flex', justifyContent: 'center', gap: '4px', opacity: isSyncing ? 0.7 : 1 }}>
         {isSyncing ? (
           <div className="spinner" style={{ width: '14px', height: '14px', borderWidth: '2px' }}></div>
         ) : (
           <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" /></svg>
         )}
-        {isSyncing ? 'جاري المزامنة...' : 'مزامنة الآن'}
+        {isSyncing ? t('caSyncing') : t('caSyncNow')}
       </button>
       <button onClick={() => onToggle(acc.id)} className="btn btn-ghost" style={{ fontSize: '.82rem', padding: '0 8px' }}>
         {acc.status === 'active' ? '⏸️' : '▶️'}
