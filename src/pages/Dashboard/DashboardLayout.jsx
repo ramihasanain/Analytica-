@@ -73,6 +73,11 @@ const DashboardLayout = () => {
             <span style={{ marginInlineStart: '12px' }}>{t('dbReports')}</span>
           </NavLink>
 
+          <NavLink to="/dashboard/operations" className={({isActive}) => `sidebar-link ${isActive ? 'active' : ''}`} style={{ flexDirection: isRTL ? 'row' : 'row-reverse', justifyContent: isRTL ? 'flex-start' : 'flex-end' }}>
+            <svg className="icon-md" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0115 18.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 15V5.25m18 0A2.25 2.25 0 0018.75 3H5.25A2.25 2.25 0 003 5.25m18 0V12a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 12V5.25" /></svg>
+            <span style={{ marginInlineStart: '12px' }}>{lang === 'ar' ? 'عمليات السحب والتحليل' : 'Scrapes & Audits'}</span>
+          </NavLink>
+
           <NavLink to="/dashboard/profile" className={({isActive}) => `sidebar-link ${isActive ? 'active' : ''}`} style={{ flexDirection: isRTL ? 'row' : 'row-reverse', justifyContent: isRTL ? 'flex-start' : 'flex-end' }}>
             <svg className="icon-md" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" /></svg>
             <span style={{ marginInlineStart: '12px' }}>{t('dbProfile')}</span>
