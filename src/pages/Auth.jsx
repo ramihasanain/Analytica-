@@ -111,7 +111,28 @@ const Auth = () => {
         navigate('/dashboard')
       }
     } catch (err) {
-      setError(err.response?.data?.error || err.response?.data?.non_field_errors?.[0] || t('authError'))
+      if (err.response?.data) {
+        const data = err.response.data
+        if (typeof data === 'string') {
+          setError(data)
+        } else if (data.error) {
+          setError(data.error)
+        } else if (data.non_field_errors && Array.isArray(data.non_field_errors)) {
+          setError(data.non_field_errors.join(' '))
+        } else if (typeof data === 'object') {
+          const msgs = Object.entries(data).map(([field, msgs]) => {
+            const translationKey = 'auth' + field.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join('')
+            const fieldLabel = t(translationKey) !== translationKey ? t(translationKey) : field
+            const msgStr = Array.isArray(msgs) ? msgs.join(' ') : String(msgs)
+            return `${fieldLabel}: ${msgStr}`
+          })
+          setError(msgs.join(' | '))
+        } else {
+          setError(t('authError'))
+        }
+      } else {
+        setError(err.message || t('authError'))
+      }
     } finally {
       setLoading(false)
     }
@@ -272,10 +293,10 @@ const Auth = () => {
 
         <div style={{ textAlign: 'center', marginTop: '32px', paddingTop: '24px', borderTop: '1px solid var(--border)' }}>
           <span style={{ color: 'var(--text-secondary)', fontSize: '.9rem' }}>
-            {isLogin ? t('authSwitchToRegister').split('?')[0] + '?' : t('authSwitchToLogin').split('?')[0] + '?'}
+            {isLogin ? (t('authSwitchToRegister').split(/[?؟]/)[0] + (isRTL ? '؟' : '?')) : (t('authSwitchToLogin').split(/[?؟]/)[0] + (isRTL ? '؟' : '?'))}
           </span>
           <span onClick={() => setIsLogin(!isLogin)} style={{ color: 'var(--blue)', fontWeight: 700, cursor: 'pointer', fontSize: '.9rem' }}>
-            {' '}{isLogin ? t('authSwitchToRegister').split('?')[1] : t('authSwitchToLogin').split('?')[1]}
+            {' '}{isLogin ? t('authSwitchToRegister').split(/[?؟]/)[1] : t('authSwitchToLogin').split(/[?؟]/)[1]}
           </span>
         </div>
       </div>
