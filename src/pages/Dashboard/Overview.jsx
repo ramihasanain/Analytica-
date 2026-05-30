@@ -124,8 +124,8 @@ const Overview = () => {
             </div>
           }
         >
-          <div style={{ height: 280, width: '100%' }}>
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="dash-chart-box" style={{ width: '100%', minHeight: 280, height: 280 }}>
+            <ResponsiveContainer width="100%" height="100%" minHeight={280}>
               <AreaChart data={timelineChart} margin={chartMargin}>
                 {chartMode === 'sentiment' ? <SentimentGradients /> : (
                   <defs>
@@ -165,7 +165,7 @@ const Overview = () => {
                       payload={payload}
                       label={label}
                       ts={ts}
-                      t={chartMode === 'volume' ? volumeName : undefined}
+                      formatSeriesName={chartMode === 'volume' ? volumeName : undefined}
                       showPercent={chartMode === 'sentiment'}
                     />
                   )}
@@ -176,7 +176,7 @@ const Overview = () => {
                   iconType="circle"
                   iconSize={8}
                   wrapperStyle={{ fontSize: '0.75rem' }}
-                  formatter={(value) => (chartMode === 'volume' ? volumeName(value) : ts(chartKeyToLabel(value)))}
+                  formatter={(value) => (chartMode === 'volume' ? volumeName(value) : chartKeyToLabel(value, ts))}
                 />
                 {chartMode === 'volume' ? (
                   <>

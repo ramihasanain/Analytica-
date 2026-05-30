@@ -411,7 +411,7 @@ const SentimentAnalytics = () => {
             {timelineData.length === 0 ? (
               <div className="sent-empty">{t('sentChartTimelineEmpty')}</div>
             ) : (
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" minHeight={320}>
                 <AreaChart data={timelineData} margin={chartMargin}>
                   <SentimentGradients />
                   <CartesianGrid strokeDasharray="4 8" vertical={false} stroke="var(--border-light)" />
@@ -457,8 +457,8 @@ const SentimentAnalytics = () => {
               <div className="sent-empty">{t('sentChartPieEmpty')}</div>
             ) : (
               <>
-                <div className="sent-donut-chart">
-                  <ResponsiveContainer width="100%" height="100%">
+                <div className="sent-donut-chart" style={{ minHeight: 220, height: 220 }}>
+                  <ResponsiveContainer width="100%" height="100%" minHeight={220}>
                     <PieChart>
                       <Pie
                         data={pieData}
@@ -529,7 +529,7 @@ const SentimentAnalytics = () => {
             {topicChartData.length === 0 ? (
               <div className="sent-empty">{t('sentChartByPostEmpty')}</div>
             ) : (
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" minHeight={300}>
                 <BarChart data={topicChartData} layout="vertical" margin={{ top: 8, right: isRTL ? 8 : 24, left: isRTL ? 24 : 8, bottom: 4 }} barCategoryGap="22%">
                   <SentimentGradients />
                   <CartesianGrid strokeDasharray="4 8" horizontal={false} stroke="var(--border-light)" />
@@ -558,7 +558,7 @@ const SentimentAnalytics = () => {
                     wrapperStyle={{ fontSize: '0.75rem', paddingBottom: 8 }}
                     formatter={(value) => {
                       const map = { posPct: CHART_KEY_POS, negPct: CHART_KEY_NEG, neuPct: CHART_KEY_NEU }
-                      return ts(chartKeyToLabel(map[value] || value))
+                      return chartKeyToLabel(map[value] || value, ts)
                     }}
                   />
                   <Bar dataKey={`${CHART_KEY_POS}Pct`} stackId="topic" fill="url(#barGradPos)" animationDuration={900} />

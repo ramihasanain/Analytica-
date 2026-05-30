@@ -29,21 +29,26 @@ export const chartKeyToLabel = (key, ts) => {
   return key
 }
 
-export const DashboardChartTooltip = ({ active, payload, label, ts, t, showPercent }) => {
+export const DashboardChartTooltip = ({ active, payload, label, ts, formatSeriesName, showPercent }) => {
   if (!active || !payload?.length) return null
   const total = payload.reduce((s, e) => s + (Number(e.value) || 0), 0)
+
+  const resolveName = (name) => {
+    if (typeof formatSeriesName === 'function') return formatSeriesName(name)
+    return chartKeyToLabel(name, ts)
+  }
 
   return (
     <div className="dash-chart-tooltip">
       {label && <div className="dash-chart-tooltip-title">{label}</div>}
-      {payload.filter((e) => e.value > 0).map((entry, i) => {
+      {payload.filter((e) => Number(e.value) > 0).map((entry, i) => {
         const val = Number(entry.value)
         const pct = showPercent && total > 0 ? ` (${Math.round((val / total) * 100)}%)` : ''
         return (
           <div key={i} className="dash-chart-tooltip-row">
             <span className="dash-chart-tooltip-dot" style={{ background: entry.color || entry.fill }} />
             <span className="dash-chart-tooltip-name">
-              {t ? t(entry.name) : chartKeyToLabel(entry.name, ts)}
+              {resolveName(entry.name)}
             </span>
             <span className="dash-chart-tooltip-val mono">
               {showPercent && String(entry.name).endsWith('Pct') ? `${val}%` : val}

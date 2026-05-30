@@ -743,6 +743,16 @@
   box-shadow: var(--shadow-sm);
 }
 
+.dash-chart-box,
+.sent-chart-h {
+  width: 100%;
+  min-height: 280px;
+  position: relative;
+}
+.sent-chart-h { height: 300px; }
+.sent-chart-h--tall { min-height: 320px; height: 320px; }
+.dash-chart-box { height: 280px; }
+
 /* Account cards in connected accounts */
 .dash-account-card {
   position: relative;
