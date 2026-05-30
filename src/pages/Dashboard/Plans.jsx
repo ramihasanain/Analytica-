@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import api from '../../services/api'
 import { useLanguage } from '../../LanguageContext'
+import { useDashPage, PageHero, DashCard, DashModal } from '../../components/dashboard/DashboardUI'
 
 const Plans = () => {
   const [showModal, setShowModal] = useState(false)
@@ -9,6 +10,7 @@ const Plans = () => {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [payments, setPayments] = useState([])
   const { t, lang, isRTL } = useLanguage()
+  const { pageProps } = useDashPage()
 
   const plans = [
     { 
@@ -77,13 +79,12 @@ const Plans = () => {
   }
 
   return (
-    <div style={{ fontFamily: isRTL ? 'var(--font-ar)' : 'var(--font-en)', direction: isRTL ? 'rtl' : 'ltr', textAlign: isRTL ? 'right' : 'left' }}>
-      <h1 style={{ fontSize: '1.6rem', marginBottom: '8px' }}>{t('plTitle')}</h1>
-      <p style={{ color: 'var(--text-secondary)', marginBottom: '32px' }}>{t('plSubtitle')}</p>
+    <div {...pageProps}>
+      <PageHero title={t('plTitle')} subtitle={t('plSubtitle')} />
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '24px', marginBottom: '40px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '24px', marginBottom: '32px' }}>
         {plans.map((plan, i) => (
-          <div key={i} className="card-flat animate-fade-up" style={{ animationDelay: `${i * .08}s`, padding: '32px', display: 'flex', flexDirection: 'column', borderTop: `4px solid ${plan.color}`, textAlign: isRTL ? 'right' : 'left' }}>
+          <div key={i} className={`dash-plan-card animate-fade-up${i === 1 ? ' featured' : ''}`} style={{ animationDelay: `${i * .08}s`, display: 'flex', flexDirection: 'column', borderTop: `4px solid ${plan.color}`, textAlign: isRTL ? 'right' : 'left' }}>
             <h3 style={{ fontSize: '1.4rem', marginBottom: '12px' }}>{plan.name}</h3>
             <div style={{ fontSize: '2rem', fontWeight: 800, marginBottom: '24px', color: plan.color }}>{plan.price}</div>
             <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 32px 0', flex: 1 }}>
@@ -105,9 +106,8 @@ const Plans = () => {
         ))}
       </div>
 
-      <div className="card-flat animate-fade-up" style={{ padding: '24px' }}>
-        <h3 style={{ marginBottom: '16px' }}>{t('plHistoryTitle')}</h3>
-        <div className="table-wrap">
+      <DashCard title={t('plHistoryTitle')}>
+        <div className="dash-table-wrap">
           <table className="data-table" style={{ direction: isRTL ? 'rtl' : 'ltr' }}>
             <thead>
               <tr style={{ flexDirection: isRTL ? 'row' : 'row-reverse' }}>
@@ -140,11 +140,11 @@ const Plans = () => {
             </tbody>
           </table>
         </div>
-      </div>
+      </DashCard>
 
       {showModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, backdropFilter: 'blur(4px)' }} onClick={() => setShowModal(false)}>
-          <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '40px', width: '480px', boxShadow: 'var(--shadow-xl)', textAlign: isRTL ? 'right' : 'left' }} onClick={e => e.stopPropagation()}>
+        <DashModal onClose={() => setShowModal(false)}>
+          <div style={{ textAlign: isRTL ? 'right' : 'left' }}>
             <h3 style={{ marginBottom: '16px' }}>{t('plModalTitle')}{selectedPlan?.name}</h3>
             <p style={{ fontSize: '.9rem', color: 'var(--text-secondary)', marginBottom: '24px', lineHeight: 1.6 }}>
               {t('plModalDesc')}
@@ -187,7 +187,7 @@ const Plans = () => {
               </div>
             </form>
           </div>
-        </div>
+        </DashModal>
       )}
     </div>
   )

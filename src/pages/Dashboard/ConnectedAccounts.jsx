@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import api from '../../services/api'
 import { useLanguage } from '../../LanguageContext'
+import { useDashPage, PageHero, DashKpi, DashCard, DashLoading, DashModal } from '../../components/dashboard/DashboardUI'
 
 const ConnectedAccounts = () => {
   const [showModal, setShowModal] = useState(false)
@@ -9,6 +10,7 @@ const ConnectedAccounts = () => {
   const [loading, setLoading] = useState(true)
   const [jobs, setJobs] = useState([])
   const { t, lang, isRTL } = useLanguage()
+  const { pageProps } = useDashPage()
 
   useEffect(() => {
     const fetchProfiles = async () => {
@@ -103,36 +105,36 @@ const ConnectedAccounts = () => {
     }
   }
 
-  if (loading) return <div style={{ padding: '40px', textAlign: 'center', fontFamily: isRTL ? 'var(--font-ar)' : 'var(--font-en)' }}>{t('dbLoading')}</div>
+  if (loading) {
+    return (
+      <div {...pageProps}>
+        <DashLoading text={t('dbLoading')} />
+      </div>
+    )
+  }
 
   return (
-    <div style={{ fontFamily: isRTL ? 'var(--font-ar)' : 'var(--font-en)', direction: isRTL ? 'rtl' : 'ltr', textAlign: isRTL ? 'right' : 'left' }}>
-      <div style={{ marginBottom: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexDirection: isRTL ? 'row' : 'row-reverse' }}>
-        <div>
-          <h1 style={{ fontSize: '1.6rem', marginBottom: '6px' }}>{t('caTitle')}</h1>
-          <p style={{ fontSize: '.92rem', color: 'var(--text-secondary)' }}>{t('caSubtitle')}</p>
-        </div>
-        <button onClick={() => setShowModal(true)} className="btn btn-blue">
-          <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
-          {t('caConnectNew')}
-        </button>
-      </div>
+    <div {...pageProps}>
+      <PageHero
+        title={t('caTitle')}
+        subtitle={t('caSubtitle')}
+        badge="Facebook API"
+        actions={
+          <button type="button" onClick={() => setShowModal(true)} className="dash-btn dash-btn-primary">
+            <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+            {t('caConnectNew')}
+          </button>
+        }
+      />
 
-      {/* Summary Stats */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px', marginBottom: '32px' }}>
+      <div className="dash-kpi-grid">
         {[
-          { label: t('caTotalAccounts'), val: accounts.length, icon: '🔗' },
-          { label: t('caActiveAccounts'), val: accounts.filter(a => a.status === 'active').length, icon: '✅' },
-          { label: t('caPausedAccounts'), val: accounts.filter(a => a.status === 'paused').length, icon: '⏸️' },
-          { label: t('caTotalPosts'), val: accounts.reduce((sum, a) => sum + a.posts, 0).toLocaleString(), icon: '📄' },
+          { label: t('caTotalAccounts'), val: accounts.length, icon: '🔗', variant: 'blue' },
+          { label: t('caActiveAccounts'), val: accounts.filter(a => a.status === 'active').length, icon: '✅', variant: 'green' },
+          { label: t('caPausedAccounts'), val: accounts.filter(a => a.status === 'paused').length, icon: '⏸️', variant: 'amber' },
+          { label: t('caTotalPosts'), val: accounts.reduce((sum, a) => sum + a.posts, 0).toLocaleString(), icon: '📄', variant: 'indigo' },
         ].map((s, i) => (
-          <div key={i} className="card-flat animate-fade-up" style={{ animationDelay: `${i * .08}s`, textAlign: isRTL ? 'right' : 'left' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', flexDirection: isRTL ? 'row' : 'row-reverse' }}>
-              <span style={{ fontSize: '.82rem', color: 'var(--text-secondary)', fontWeight: 600 }}>{s.label}</span>
-              <span>{s.icon}</span>
-            </div>
-            <div className="mono" style={{ fontSize: '1.6rem', fontWeight: 800 }}>{s.val}</div>
-          </div>
+          <DashKpi key={i} variant={s.variant} icon={s.icon} label={s.label} value={s.val} delay={i * 0.06} />
         ))}
       </div>
 
@@ -150,9 +152,8 @@ const ConnectedAccounts = () => {
       </div>
 
       {/* Scrape History */}
-      <div className="card-flat" style={{ padding: '28px' }}>
-        <h3 style={{ fontSize: '1.05rem', marginBottom: '20px' }}>{t('caScrapeHistory')}</h3>
-        <div className="table-wrap">
+      <DashCard title={t('caScrapeHistory')}>
+        <div className="dash-table-wrap">
           <table className="data-table" style={{ direction: isRTL ? 'rtl' : 'ltr' }}>
             <thead>
               <tr style={{ flexDirection: isRTL ? 'row' : 'row-reverse' }}>
@@ -187,12 +188,11 @@ const ConnectedAccounts = () => {
             </tbody>
           </table>
         </div>
-      </div>
+      </DashCard>
 
-      {/* Add Account Modal */}
       {showModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, backdropFilter: 'blur(4px)' }} onClick={() => setShowModal(false)}>
-          <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '40px', width: '480px', boxShadow: 'var(--shadow-xl)', textAlign: isRTL ? 'right' : 'left' }} onClick={e => e.stopPropagation()}>
+        <DashModal onClose={() => setShowModal(false)}>
+          <div style={{ textAlign: isRTL ? 'right' : 'left' }}>
             <h2 style={{ fontSize: '1.4rem', marginBottom: '8px' }}>{t('caConnectNew')}</h2>
             <p style={{ fontSize: '.9rem', color: 'var(--text-secondary)', marginBottom: '28px' }}>{t('caModalDesc')}</p>
 
@@ -207,14 +207,14 @@ const ConnectedAccounts = () => {
               <button type="button" onClick={() => setShowModal(false)} className="btn btn-outline" style={{ flex: 1, padding: '14px 24px' }}>{t('caCancel')}</button>
             </div>
           </div>
-        </div>
+        </DashModal>
       )}
     </div>
   )
 }
 
 const AccountCard = ({ acc, onDelete, onToggle, onSync, isSyncing, t, isRTL, lang }) => (
-  <div className="card-flat animate-fade-up" style={{ position: 'relative', textAlign: isRTL ? 'right' : 'left' }}>
+  <div className="dash-account-card animate-fade-up" style={{ position: 'relative', textAlign: isRTL ? 'right' : 'left' }}>
     <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '18px', flexDirection: isRTL ? 'row' : 'row-reverse' }}>
       <div style={{ width: '42px', height: '42px', borderRadius: '10px', background: 'rgba(24, 119, 242, 0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
         {acc.profile_picture_url ? (

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import api from '../../services/api'
-import { useLanguage } from '../../LanguageContext'
 import { isGeminiEngine, isLocalTrainedEngine } from '../../utils/i18nHelpers'
+import { useDashPage, PageHero, DashKpi, DashCard, DashFilters, DashAlert, DashLoading } from '../../components/dashboard/DashboardUI'
 
 const Operations = () => {
   const [logs, setLogs] = useState([])
@@ -11,7 +11,7 @@ const Operations = () => {
   const [typeFilter, setTypeFilter] = useState('all')
   const [engineFilter, setEngineFilter] = useState('all')
   const [selectedItem, setSelectedItem] = useState(null) // For modal
-  const { t, lang, isRTL, ts } = useLanguage()
+  const { t, lang, isRTL, ts, pageProps } = useDashPage()
 
   const fetchOperationsLog = async () => {
     try {
@@ -72,146 +72,65 @@ const Operations = () => {
     }
   }
 
-  return (
-    <div style={{ fontFamily: isRTL ? 'var(--font-ar)' : 'var(--font-en)', direction: isRTL ? 'rtl' : 'ltr', textAlign: isRTL ? 'right' : 'left' }}>
-      <style>{`
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(10px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        .log-row:hover {
-          background-color: var(--bg-elevated) !important;
-          transform: translateY(-1px);
-        }
-      `}</style>
-
-      {/* Header */}
-      <div style={{ marginBottom: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px', flexDirection: isRTL ? 'row' : 'row-reverse' }}>
-        <div>
-          <h1 style={{ fontSize: '1.6rem', marginBottom: '6px' }}>{t('opsTitle')}</h1>
-          <p style={{ fontSize: '.92rem', color: 'var(--text-secondary)' }}>{t('opsSubtitle')}</p>
-        </div>
-        <button onClick={fetchOperationsLog} className="btn" style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg-card)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', outline: 'none' }}>
-          🔄 {t('opsRefresh')}
-        </button>
+  if (loading) {
+    return (
+      <div {...pageProps}>
+        <DashLoading text={t('opsLoading')} />
       </div>
+    )
+  }
 
-      {error && (
-        <div style={{ padding: '16px', background: 'var(--red-light)', color: 'var(--red)', borderRadius: '8px', marginBottom: '24px' }}>
-          ⚠️ {error}
+  return (
+    <div {...pageProps}>
+      <style>{`.log-row:hover { background: var(--bg-elevated) !important; transform: translateY(-1px); }`}</style>
+
+      <PageHero
+        title={t('opsTitle')}
+        subtitle={t('opsSubtitle')}
+        actions={
+          <button type="button" onClick={fetchOperationsLog} className="dash-btn dash-btn-ghost" style={{ color: '#fff', borderColor: 'rgba(255,255,255,.25)', background: 'rgba(255,255,255,.1)' }}>
+            🔄 {t('opsRefresh')}
+          </button>
+        }
+      />
+
+      {error && <DashAlert variant="error">⚠️ {error}</DashAlert>}
+
+      {!error && (
+        <div className="dash-kpi-grid">
+          <DashKpi variant="blue" icon="📋" label={t('opsTotalItems')} value={totalItems} sub={t('opsTotalDesc')} delay={0.08} />
+          <DashKpi variant="violet" icon="🧠" label={t('opsAiCoverage')} value={`${aiPercentage}%`} sub={t('opsAiDesc', { count: aiCount })} progress={aiPercentage} delay={0.12} />
+          <DashKpi variant="green" icon="💻" label={t('opsLocalCoverage')} value={`${localPercentage}%`} sub={t('opsLocalDesc', { count: localCount })} progress={localPercentage} delay={0.16} />
         </div>
       )}
 
-      {/* High Density Lineage Statistics */}
-      {!loading && !error && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '20px', marginBottom: '32px' }}>
-          {/* Card 1: Total Scrapes */}
-          <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', padding: '20px 24px', borderRadius: '16px', animation: 'fadeIn 0.4s ease-out' }}>
-            <div style={{ fontSize: '.82rem', fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: '8px' }}>
-              {t('opsTotalItems')}
-            </div>
-            <div className="mono" style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '4px' }}>
-              {totalItems}
-            </div>
-            <span style={{ fontSize: '.75rem', color: 'var(--text-secondary)' }}>
-              {t('opsTotalDesc')}
-            </span>
-          </div>
-
-          {/* Card 2: AI-Powered */}
-          <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', padding: '20px 24px', borderRadius: '16px', animation: 'fadeIn 0.5s ease-out' }}>
-            <div style={{ fontSize: '.82rem', fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: '8px' }}>
-              {t('opsAiCoverage')}
-            </div>
-            <div className="mono" style={{ fontSize: '2rem', fontWeight: 800, color: '#8b5cf6', marginBottom: '4px' }}>
-              {aiPercentage}%
-            </div>
-            <span style={{ fontSize: '.75rem', color: 'var(--text-secondary)' }}>
-              {t('opsAiDesc', { count: aiCount })}
-            </span>
-          </div>
-
-          {/* Card 3: Local Engine */}
-          <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', padding: '20px 24px', borderRadius: '16px', animation: 'fadeIn 0.6s ease-out' }}>
-            <div style={{ fontSize: '.82rem', fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: '8px' }}>
-              {t('opsLocalCoverage')}
-            </div>
-            <div className="mono" style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--blue)', marginBottom: '4px' }}>
-              {localPercentage}%
-            </div>
-            <span style={{ fontSize: '.75rem', color: 'var(--text-secondary)' }}>
-              {t('opsLocalDesc', { count: localCount })}
-            </span>
-          </div>
-        </div>
-      )}
-
-      {/* Filters and Search */}
-      {!loading && !error && (
-        <div style={{ 
-          background: 'var(--bg-card)', 
-          border: '1px solid var(--border)', 
-          padding: '16px 20px', 
-          borderRadius: '12px', 
-          display: 'flex', 
-          gap: '16px', 
-          alignItems: 'center', 
-          flexWrap: 'wrap', 
-          marginBottom: '24px',
-          flexDirection: isRTL ? 'row' : 'row-reverse' 
-        }}>
-          {/* Search bar */}
+      {!error && (
+        <DashFilters>
           <input
             type="text"
+            className="dash-input"
             placeholder={`🔍 ${t('opsSearchPlaceholder')}`}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            style={{ 
-              flex: 1, 
-              minWidth: '220px', 
-              padding: '9px 16px', 
-              borderRadius: '8px', 
-              border: '1px solid var(--border)', 
-              background: 'var(--bg)', 
-              color: 'var(--text-primary)',
-              fontFamily: isRTL ? 'var(--font-ar)' : 'var(--font-en)',
-              fontSize: '.85rem',
-              outline: 'none'
-            }}
           />
 
           {/* Media Type Filter */}
-          <select
-            value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value)}
-            style={{ padding: '9px 16px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text-primary)', fontFamily: isRTL ? 'var(--font-ar)' : 'var(--font-en)', fontSize: '.85rem', fontWeight: 600, outline: 'none', cursor: 'pointer' }}
-          >
+          <select className="dash-select" value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
             <option value="all">📱 {t('opsFilterAllTypes')}</option>
             <option value="post">📝 {t('opsFilterPost')}</option>
             <option value="comment">💬 {t('opsFilterComment')}</option>
           </select>
-
-          {/* Engine Filter */}
-          <select
-            value={engineFilter}
-            onChange={(e) => setEngineFilter(e.target.value)}
-            style={{ padding: '9px 16px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text-primary)', fontFamily: isRTL ? 'var(--font-ar)' : 'var(--font-en)', fontSize: '.85rem', fontWeight: 600, outline: 'none', cursor: 'pointer' }}
-          >
+          <select className="dash-select" value={engineFilter} onChange={(e) => setEngineFilter(e.target.value)}>
             <option value="all">⚙️ {t('opsFilterAllEngines')}</option>
             <option value="ai">🧠 {t('opsFilterAi')}</option>
             <option value="local">💻 {t('opsFilterLocalModel')}</option>
           </select>
-        </div>
+        </DashFilters>
       )}
 
-      {/* Main Operations Table */}
-      {loading ? (
-        <div style={{ padding: '60px', textAlign: 'center', color: 'var(--text-secondary)' }}>
-          <span style={{ fontSize: '1.2rem', display: 'block', marginBottom: '10px' }}>⏳</span>
-          {t('opsLoading')}
-        </div>
-      ) : (
-        <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '16px', overflow: 'hidden' }}>
+      {!error && (
+        <DashCard>
+          <div className="dash-table-wrap" style={{ border: 'none' }}>
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.88rem', textAlign: isRTL ? 'right' : 'left' }}>
               <thead>
@@ -303,36 +222,13 @@ const Operations = () => {
               </tbody>
             </table>
           </div>
-        </div>
+          </div>
+        </DashCard>
       )}
 
-      {/* Detailed Diagnostics Modal */}
       {selectedItem && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(0,0,0,0.5)',
-          backdropFilter: 'blur(4px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 9999,
-          animation: 'fadeIn 0.2s ease-out'
-        }} onClick={() => setSelectedItem(null)}>
-          <div style={{
-            background: 'var(--bg-card)',
-            border: '1px solid var(--border)',
-            padding: '32px',
-            borderRadius: '16px',
-            width: '100%',
-            maxWidth: '600px',
-            boxShadow: '0 20px 40px rgba(0,0,0,0.15)',
-            textAlign: isRTL ? 'right' : 'left',
-            direction: isRTL ? 'rtl' : 'ltr'
-          }} onClick={(e) => e.stopPropagation()}>
+        <div className="dash-modal-overlay" onClick={() => setSelectedItem(null)}>
+          <div className="dash-modal" style={{ maxWidth: 600, textAlign: isRTL ? 'right' : 'left' }} onClick={(e) => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexDirection: isRTL ? 'row' : 'row-reverse' }}>
               <h2 style={{ fontSize: '1.25rem', margin: 0, fontWeight: 800 }}>
                 🔍 {t('opsDiagTitle')} #{selectedItem.id}

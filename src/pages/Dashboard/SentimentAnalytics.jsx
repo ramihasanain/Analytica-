@@ -258,7 +258,7 @@ const SentimentAnalytics = () => {
 
   return (
     <div
-      className="sent-page"
+      className="sent-page dash-page"
       style={{ fontFamily: isRTL ? 'var(--font-ar)' : 'var(--font-en)', direction: isRTL ? 'rtl' : 'ltr' }}
     >
       {/* Hero */}

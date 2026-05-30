@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import api from '../../services/api'
 import { useLanguage } from '../../LanguageContext'
+import { useDashPage, PageHero, DashModal } from '../../components/dashboard/DashboardUI'
 
 const Reports = () => {
   const [reports, setReports] = useState([])
@@ -8,6 +9,7 @@ const Reports = () => {
   const [showModal, setShowModal] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const { t, lang, isRTL } = useLanguage()
+  const { pageProps } = useDashPage()
 
   // New report form states
   const [reportType, setReportType] = useState('General')
@@ -89,19 +91,19 @@ const Reports = () => {
   }
 
   return (
-    <div style={{ fontFamily: isRTL ? 'var(--font-ar)' : 'var(--font-en)', direction: isRTL ? 'rtl' : 'ltr', textAlign: isRTL ? 'right' : 'left' }}>
-      <div style={{ marginBottom: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexDirection: isRTL ? 'row' : 'row-reverse' }}>
-        <div>
-          <h1 style={{ fontSize: '1.6rem', marginBottom: '6px' }}>{t('dbReports')}</h1>
-          <p style={{ fontSize: '.92rem', color: 'var(--text-secondary)' }}>{t('repSubtitle')}</p>
-        </div>
-        <button onClick={() => setShowModal(true)} className="btn btn-blue" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
-          {t('repGenerateNew')}
-        </button>
-      </div>
+    <div {...pageProps}>
+      <PageHero
+        title={t('dbReports')}
+        subtitle={t('repSubtitle')}
+        actions={
+          <button type="button" onClick={() => setShowModal(true)} className="dash-btn dash-btn-primary">
+            <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+            {t('repGenerateNew')}
+          </button>
+        }
+      />
 
-      <div className="table-wrap">
+      <div className="dash-table-wrap">
         <table className="data-table" style={{ direction: isRTL ? 'rtl' : 'ltr' }}>
           <thead>
             <tr style={{ flexDirection: isRTL ? 'row' : 'row-reverse' }}>
@@ -139,8 +141,8 @@ const Reports = () => {
 
       {/* Generate Report Modal */}
       {showModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, backdropFilter: 'blur(4px)' }} onClick={() => setShowModal(false)}>
-          <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '40px', width: '480px', boxShadow: 'var(--shadow-xl)', textAlign: isRTL ? 'right' : 'left' }} onClick={e => e.stopPropagation()}>
+        <DashModal onClose={() => setShowModal(false)}>
+          <div style={{ textAlign: isRTL ? 'right' : 'left' }}>
             <h2 style={{ fontSize: '1.4rem', marginBottom: '8px' }}>{t('repModalTitle')}</h2>
             <p style={{ fontSize: '.9rem', color: 'var(--text-secondary)', marginBottom: '28px' }}>{t('repModalDesc')}</p>
 
@@ -194,7 +196,7 @@ const Reports = () => {
               </div>
             </form>
           </div>
-        </div>
+        </DashModal>
       )}
     </div>
   )

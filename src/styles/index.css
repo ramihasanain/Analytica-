@@ -189,6 +189,10 @@ a { text-decoration: none; color: inherit; }
   right: 0; top: 6px; bottom: 6px; width: 3px;
   background: var(--blue); border-radius: 0 3px 3px 0;
 }
+[dir="ltr"] .sidebar-link.active::before {
+  right: auto; left: 0;
+  border-radius: 3px 0 0 3px;
+}
 
 /* ═══════ ICON SIZES ═══════ */
 .icon-xs { width: 14px; height: 14px; flex-shrink: 0; }

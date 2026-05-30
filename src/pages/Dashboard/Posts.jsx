@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import api from '../../services/api'
 import { useLanguage } from '../../LanguageContext'
+import { useDashPage, PageHero, DashLoading, DashAlert } from '../../components/dashboard/DashboardUI'
 
 const Posts = () => {
   const [posts, setPosts] = useState([])
@@ -16,6 +17,7 @@ const Posts = () => {
   const [expandedPost, setExpandedPost] = useState(null)
   const [expandedPostData, setExpandedPostData] = useState({})
   const { t, lang, isRTL, ts, topicLabel, formatDate } = useLanguage()
+  const { pageProps } = useDashPage()
   const [isClassifyingTopics, setIsClassifyingTopics] = useState(false)
   const [aiTopicsMessage, setAiTopicsMessage] = useState('')
   
@@ -206,14 +208,11 @@ const Posts = () => {
   })
 
   return (
-    <div style={{ fontFamily: isRTL ? 'var(--font-ar)' : 'var(--font-en)', direction: isRTL ? 'rtl' : 'ltr', textAlign: isRTL ? 'right' : 'left' }}>
-      <div style={{ marginBottom: '32px' }}>
-        <h1 style={{ fontSize: '1.6rem', marginBottom: '6px' }}>{t('postsTitle')}</h1>
-        <p style={{ fontSize: '.92rem', color: 'var(--text-secondary)' }}>{t('postsSubtitle')}</p>
-      </div>
+    <div {...pageProps}>
+      <PageHero title={t('postsTitle')} subtitle={t('postsSubtitle')} badge={lang === 'ar' ? 'فيسبوك · تحليل مباشر' : 'Facebook · Live analysis'} />
 
-      {loading && <div style={{ padding: '40px', textAlign: 'center' }}>{t('dbLoading')}</div>}
-      {error && <div style={{ padding: '20px', background: 'var(--red-light)', color: 'var(--red)', borderRadius: '8px' }}>{error}</div>}
+      {loading && <DashLoading text={t('dbLoading')} />}
+      {error && <DashAlert variant="error">{error}</DashAlert>}
 
       {!loading && !error && (
         <>
@@ -232,18 +231,7 @@ const Posts = () => {
             }
           `}</style>
 
-          {/* Dynamic Analysis Progress Tracker */}
-          <div style={{ 
-            background: 'var(--blue-soft)', 
-            backdropFilter: 'blur(16px)', 
-            border: '1px solid var(--blue-light)',
-            padding: '20px 24px', 
-            borderRadius: '16px', 
-            marginBottom: '28px',
-            boxShadow: '0 8px 24px rgba(37, 99, 235, 0.04)',
-            color: 'var(--text-primary)',
-            animation: 'fadeIn 0.6s cubic-bezier(0.16, 1, 0.3, 1)'
-          }}>
+          <div className="dash-progress-banner animate-fade-up">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '12px', flexDirection: isRTL ? 'row' : 'row-reverse' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexDirection: isRTL ? 'row' : 'row-reverse' }}>
                 <span style={{ 
@@ -266,23 +254,11 @@ const Posts = () => {
               </span>
             </div>
 
-            {/* Progress Bar Track */}
-            <div style={{ 
-              width: '100%', 
-              height: '8px', 
-              background: 'var(--bg-card)', 
-              borderRadius: '999px', 
-              overflow: 'hidden', 
-              marginBottom: '16px',
-              border: '1px solid var(--border)'
-            }}>
-              <div style={{ 
-                width: `${analysisStats.percentage}%`, 
-                height: '100%', 
-                background: analysisStats.percentage < 100 ? 'linear-gradient(90deg, var(--blue), #8b5cf6)' : 'linear-gradient(90deg, var(--green), #059669)',
-                borderRadius: '999px',
-                transition: 'width 0.8s cubic-bezier(0.4, 0, 0.2, 1)'
-              }}></div>
+            <div className="dash-progress-track">
+              <div
+                className={`dash-progress-fill${analysisStats.percentage >= 100 ? ' done' : ''}`}
+                style={{ width: `${analysisStats.percentage}%` }}
+              />
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '.8rem', color: 'var(--text-secondary)', flexDirection: isRTL ? 'row' : 'row-reverse' }}>
@@ -299,8 +275,7 @@ const Posts = () => {
             </div>
           </div>
 
-          {/* Filters */}
-          <div style={{ display: 'flex', gap: '12px', marginBottom: '24px', flexWrap: 'wrap', alignItems: 'center', flexDirection: isRTL ? 'row' : 'row-reverse' }}>
+          <div className="dash-filters" style={{ marginBottom: 24 }}>
             {/* Sentiment Filter */}
             <div style={{ display: 'flex', gap: '4px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', padding: '3px', flexDirection: isRTL ? 'row' : 'row-reverse' }}>
               {[
@@ -316,20 +291,12 @@ const Posts = () => {
             </div>
 
             {/* Topic Filter */}
-            <select
-              value={topicFilter}
-              onChange={(e) => setTopicFilter(e.target.value)}
-              style={{ padding: '9px 16px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', background: 'var(--bg-card)', color: 'var(--text-primary)', fontFamily: isRTL ? 'var(--font-ar)' : 'var(--font-en)', fontWeight: 600, fontSize: '.85rem', cursor: 'pointer', outline: 'none' }}
-            >
+            <select className="dash-select" value={topicFilter} onChange={(e) => setTopicFilter(e.target.value)}>
               {topics.map(topic => <option key={topic} value={topic}>{topic === 'الكل' ? `📌 ${t('postsAllTopics')}` : `📌 ${topicLabel(topic)}`}</option>)}
             </select>
 
             {/* Profile Filter */}
-            <select
-              value={profileFilter}
-              onChange={(e) => setProfileFilter(e.target.value)}
-              style={{ padding: '9px 16px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', background: 'var(--bg-card)', color: 'var(--text-primary)', fontFamily: isRTL ? 'var(--font-ar)' : 'var(--font-en)', fontWeight: 600, fontSize: '.85rem', cursor: 'pointer', outline: 'none' }}
-            >
+            <select className="dash-select" value={profileFilter} onChange={(e) => setProfileFilter(e.target.value)}>
               <option value="all">🏢 {t('postsAllPages')}</option>
               {profiles.map(prof => (
                 <option key={prof.id} value={prof.id}>
@@ -400,7 +367,7 @@ const Posts = () => {
           {/* Posts List */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             {filtered.map(post => (
-              <div key={post.id} className="card-flat" style={{ transition: 'all .2s', border: expandedPost === post.id ? '1px solid var(--blue)' : undefined, boxShadow: expandedPost === post.id ? '0 4px 20px rgba(37,99,235,.08)' : undefined }}>
+              <div key={post.id} className="dash-card" style={{ padding: '20px 22px', transition: 'all .2s', border: expandedPost === post.id ? '1px solid var(--blue)' : undefined, boxShadow: expandedPost === post.id ? '0 8px 28px rgba(37,99,235,.12)' : undefined }}>
                 {/* Post Header & Content */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '24px', flexDirection: isRTL ? 'row' : 'row-reverse' }}>
                   <div style={{ flex: 1 }}>

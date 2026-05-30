@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import api from '../../services/api'
+import { useDashPage, PageHero, DashCard, DashLoading, DashAlert } from '../../components/dashboard/DashboardUI'
 
 const passwordCriteria = (password) => {
   if (!password) return {
@@ -130,31 +131,25 @@ const Profile = () => {
     }
   }
 
+  const { pageProps } = useDashPage()
+
   if (loading) {
-    return <div style={{ padding: '24px' }}>جاري تحميل الملف الشخصي...</div>
+    return (
+      <div {...pageProps}>
+        <DashLoading text="جاري تحميل الملف الشخصي..." />
+      </div>
+    )
   }
 
   return (
-    <div style={{ maxWidth: '600px' }}>
-      <div style={{ marginBottom: '24px' }}>
-        <h1 style={{ fontSize: '1.5rem', marginBottom: '8px' }}>الملف الشخصي</h1>
-        <p style={{ color: 'var(--text-secondary)' }}>تحديث بيانات حسابك ومعلومات الشركة.</p>
-      </div>
+    <div {...pageProps} style={{ ...pageProps.style, maxWidth: 720 }}>
+      <PageHero title="الملف الشخصي" subtitle="تحديث بيانات حسابك ومعلومات الشركة." />
 
       {message.text && (
-        <div style={{
-          padding: '12px 16px',
-          borderRadius: 'var(--radius-sm)',
-          marginBottom: '24px',
-          background: message.type === 'success' ? 'rgba(34, 197, 94, 0.1)' : 'var(--red-light)',
-          color: message.type === 'success' ? '#22c55e' : 'var(--red)',
-          border: `1px solid ${message.type === 'success' ? 'rgba(34, 197, 94, 0.2)' : 'rgba(239, 68, 68, 0.2)'}`
-        }}>
-          {message.text}
-        </div>
+        <DashAlert variant={message.type === 'success' ? 'success' : 'error'}>{message.text}</DashAlert>
       )}
 
-      <div className="card" style={{ padding: '24px' }}>
+      <DashCard>
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           
           <div className="form-group" style={{ marginBottom: 0 }}>
@@ -268,17 +263,17 @@ const Profile = () => {
           </div>
 
           <div style={{ marginTop: '12px', display: 'flex', justifyContent: 'flex-end' }}>
-            <button 
-              type="submit" 
-              className="btn btn-dark" 
+            <button
+              type="submit"
+              className="dash-btn dash-btn-primary"
               disabled={saving}
-              style={{ minWidth: '120px', opacity: saving ? 0.7 : 1 }}
+              style={{ minWidth: 140, opacity: saving ? 0.7 : 1 }}
             >
               {saving ? 'جاري الحفظ...' : 'حفظ التغييرات'}
             </button>
           </div>
         </form>
-      </div>
+      </DashCard>
     </div>
   )
 }
