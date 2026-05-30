@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import Landing from './pages/Landing'
 import Pricing from './pages/Pricing'
 import Auth from './pages/Auth'
+import GoogleAuthCallback from './pages/GoogleAuthCallback'
 import DashboardLayout from './pages/Dashboard/DashboardLayout'
 import Overview from './pages/Dashboard/Overview'
 import Posts from './pages/Dashboard/Posts'
@@ -20,6 +21,7 @@ function App() {
         <Route path="/" element={<Landing />} />
         <Route path="/pricing" element={<Pricing />} />
         <Route path="/auth" element={<Auth />} />
+        <Route path="/auth/google/callback" element={<GoogleAuthCallback />} />
         <Route path="/dashboard" element={<DashboardLayout />}>
           <Route index element={<Overview />} />
           <Route path="posts" element={<Posts />} />

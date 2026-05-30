@@ -1,7 +1,8 @@
-import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
 import api from '../services/api'
 import { useLanguage } from '../LanguageContext'
+import { applyAuthSuccess, handleAuthResponse } from '../utils/authFlow'
 
 const passwordCriteria = (password) => {
   if (!password) return {
@@ -60,11 +61,41 @@ const passwordCriteria = (password) => {
 
 const Auth = () => {
   const [isLogin, setIsLogin] = useState(true)
+  const [flow, setFlow] = useState('form')
+  const [challengeToken, setChallengeToken] = useState('')
+  const [qrImage, setQrImage] = useState('')
+  const [manualKey, setManualKey] = useState('')
+  const [totpCode, setTotpCode] = useState('')
   const [formData, setFormData] = useState({ username: '', email: '', password: '', company_name: '', country: '', phone_number: '' })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
+  const location = useLocation()
   const { t, lang, toggleLang, isRTL } = useLanguage()
+
+  useEffect(() => {
+    const state = location.state
+    if (!state?.flow) return
+    if (state.flow === 'totp-setup') {
+      setFlow('totp-setup')
+      setChallengeToken(state.challengeToken || '')
+      setQrImage(state.qrImage || '')
+      setManualKey(state.manualKey || '')
+    } else if (state.flow === 'totp-verify') {
+      setFlow('totp-verify')
+      setChallengeToken(state.challengeToken || '')
+    }
+    window.history.replaceState({}, document.title, location.pathname)
+  }, [location])
+
+  const resetToForm = () => {
+    setFlow('form')
+    setChallengeToken('')
+    setQrImage('')
+    setManualKey('')
+    setTotpCode('')
+    setError('')
+  }
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value })
@@ -86,15 +117,14 @@ const Auth = () => {
 
     try {
       if (isLogin) {
-        const res = await api.post('/token-auth/', {
+        const res = await api.post('/auth/login/', {
           username: formData.username,
           password: formData.password
         })
-        localStorage.setItem('token', res.data.access)
-        localStorage.setItem('refresh', res.data.refresh)
-        navigate('/dashboard')
+        if (handleAuthResponse(res.data, navigate)) return
+        setError(t('authError'))
       } else {
-        const res = await api.post('/users/', {
+        await api.post('/users/', {
           username: formData.username,
           email: formData.email,
           password: formData.password,
@@ -102,13 +132,12 @@ const Auth = () => {
           country: formData.country,
           phone_number: formData.phone_number
         })
-        const loginRes = await api.post('/token-auth/', {
+        const loginRes = await api.post('/auth/login/', {
           username: formData.username,
           password: formData.password
         })
-        localStorage.setItem('token', loginRes.data.access)
-        localStorage.setItem('refresh', loginRes.data.refresh)
-        navigate('/dashboard')
+        if (handleAuthResponse(loginRes.data, navigate)) return
+        setError(t('authError'))
       }
     } catch (err) {
       if (err.response?.data) {
@@ -137,6 +166,53 @@ const Auth = () => {
       setLoading(false)
     }
   }
+
+  const handleGoogleLogin = async () => {
+    setError('')
+    setLoading(true)
+    try {
+      const res = await api.get('/auth/google/url/')
+      window.location.href = res.data.auth_url
+    } catch (err) {
+      setError(err.response?.data?.error || t('authGoogleNotConfigured'))
+      setLoading(false)
+    }
+  }
+
+  const handleTotpSubmit = async (e) => {
+    e.preventDefault()
+    setError('')
+    if (!totpCode.trim()) {
+      setError(t('authTotpRequired'))
+      return
+    }
+    setLoading(true)
+    try {
+      const endpoint = flow === 'totp-setup' ? '/auth/totp/confirm-setup/' : '/auth/totp/verify/'
+      const res = await api.post(endpoint, {
+        challenge_token: challengeToken,
+        code: totpCode.trim(),
+      })
+      if (applyAuthSuccess(res.data, navigate)) return
+      setError(t('authError'))
+    } catch (err) {
+      setError(err.response?.data?.error || t('authTotpInvalid'))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const formTitle = flow === 'totp-setup'
+    ? t('authTotpSetupTitle')
+    : flow === 'totp-verify'
+      ? t('authTotpVerifyTitle')
+      : (isLogin ? t('authTitleLogin') : t('authTitleRegister'))
+
+  const formSub = flow === 'totp-setup'
+    ? t('authTotpSetupSub')
+    : flow === 'totp-verify'
+      ? t('authTotpVerifySub')
+      : (isLogin ? t('authSubLogin') : t('authSubRegister'))
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', flexDirection: isRTL ? 'row' : 'row-reverse', fontFamily: isRTL ? 'var(--font-ar)' : 'var(--font-en)' }}>
@@ -174,11 +250,81 @@ const Auth = () => {
           </button>
         </div>
 
-        <h2 style={{ fontSize: '1.6rem', marginBottom: '8px' }}>{isLogin ? t('authTitleLogin') : t('authTitleRegister')}</h2>
-        <p style={{ fontSize: '.95rem', marginBottom: '32px', color: 'var(--text-secondary)' }}>{isLogin ? t('authSubLogin') : t('authSubRegister')}</p>
+        <h2 style={{ fontSize: '1.6rem', marginBottom: '8px' }}>{formTitle}</h2>
+        <p style={{ fontSize: '.95rem', marginBottom: '32px', color: 'var(--text-secondary)' }}>{formSub}</p>
 
         {error && <div style={{ background: 'var(--red-light)', color: 'var(--red)', padding: '12px', borderRadius: 'var(--radius-sm)', marginBottom: '16px', fontSize: '.9rem' }}>{error}</div>}
 
+        {flow === 'totp-setup' && (
+          <form onSubmit={handleTotpSubmit}>
+            <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+              {qrImage ? (
+                <img src={qrImage} alt="QR" style={{ width: '200px', height: '200px', borderRadius: '12px', border: '1px solid var(--border)', padding: '8px', background: '#fff' }} />
+              ) : (
+                <div style={{ padding: '24px', color: 'var(--text-secondary)' }}>{t('dbLoading')}</div>
+              )}
+              <p style={{ fontSize: '.85rem', color: 'var(--text-secondary)', marginTop: '12px' }}>{t('authTotpScanHint')}</p>
+              {manualKey && (
+                <div style={{ marginTop: '12px', padding: '10px', background: 'var(--bg-elevated)', borderRadius: 'var(--radius-sm)', fontSize: '.8rem', wordBreak: 'break-all', direction: 'ltr' }}>
+                  <strong>{t('authTotpManualKey')}:</strong> {manualKey}
+                </div>
+              )}
+            </div>
+            <div className="form-group">
+              <label className="form-label">{t('authTotpCode')}</label>
+              <input
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={6}
+                value={totpCode}
+                onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                className="form-input"
+                dir="ltr"
+                placeholder="000000"
+                autoComplete="one-time-code"
+                required
+              />
+            </div>
+            <button type="submit" className="btn btn-dark" disabled={loading} style={{ width: '100%', padding: '14px', fontSize: '1rem', marginTop: '8px', opacity: loading ? 0.7 : 1 }}>
+              {loading ? t('dbLoading') : t('authTotpActivate')}
+            </button>
+            <button type="button" onClick={resetToForm} className="btn" style={{ width: '100%', padding: '12px', marginTop: '12px' }}>
+              {t('authTotpBack')}
+            </button>
+          </form>
+        )}
+
+        {flow === 'totp-verify' && (
+          <form onSubmit={handleTotpSubmit}>
+            <div className="form-group">
+              <label className="form-label">{t('authTotpCode')}</label>
+              <input
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={6}
+                value={totpCode}
+                onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                className="form-input"
+                dir="ltr"
+                placeholder="000000"
+                autoComplete="one-time-code"
+                required
+                autoFocus
+              />
+            </div>
+            <button type="submit" className="btn btn-dark" disabled={loading} style={{ width: '100%', padding: '14px', fontSize: '1rem', marginTop: '8px', opacity: loading ? 0.7 : 1 }}>
+              {loading ? t('dbLoading') : t('authBtnLogin')}
+            </button>
+            <button type="button" onClick={resetToForm} className="btn" style={{ width: '100%', padding: '12px', marginTop: '12px' }}>
+              {t('authTotpBack')}
+            </button>
+          </form>
+        )}
+
+        {flow === 'form' && (
+        <>
         <form onSubmit={handleSubmit}>
           {!isLogin && (
             <div className="form-group">
@@ -291,6 +437,38 @@ const Auth = () => {
           </button>
         </form>
 
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', margin: '20px 0' }}>
+          <div style={{ flex: 1, height: '1px', background: 'var(--border)' }} />
+          <span style={{ color: 'var(--text-tertiary)', fontSize: '.85rem' }}>{t('authOr')}</span>
+          <div style={{ flex: 1, height: '1px', background: 'var(--border)' }} />
+        </div>
+
+        <button
+          type="button"
+          onClick={handleGoogleLogin}
+          disabled={loading}
+          className="btn"
+          style={{
+            width: '100%',
+            padding: '12px 14px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '10px',
+            border: '1px solid var(--border)',
+            background: '#fff',
+            fontWeight: 600,
+          }}
+        >
+          <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden>
+            <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+            <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.56 2.96-2.24 5.48-4.78 7.18l7.73 6c4.51-4.16 7.11-10.28 7.11-17.65z"/>
+            <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+            <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+          </svg>
+          {t('authGoogleBtn')}
+        </button>
+
         <div style={{ textAlign: 'center', marginTop: '32px', paddingTop: '24px', borderTop: '1px solid var(--border)' }}>
           <span style={{ color: 'var(--text-secondary)', fontSize: '.9rem' }}>
             {isLogin ? (t('authSwitchToRegister').split(/[?؟]/)[0] + (isRTL ? '؟' : '?')) : (t('authSwitchToLogin').split(/[?؟]/)[0] + (isRTL ? '؟' : '?'))}
@@ -299,6 +477,14 @@ const Auth = () => {
             {' '}{isLogin ? t('authSwitchToRegister').split(/[?؟]/)[1] : t('authSwitchToLogin').split(/[?؟]/)[1]}
           </span>
         </div>
+        </>
+        )}
+
+        {flow !== 'form' && (
+        <div style={{ textAlign: 'center', marginTop: '24px', paddingTop: '16px', borderTop: '1px solid var(--border)' }}>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '.85rem', lineHeight: 1.6 }}>{t('authTotpExistingNote')}</p>
+        </div>
+        )}
       </div>
     </div>
   )

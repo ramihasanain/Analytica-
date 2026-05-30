@@ -12,7 +12,15 @@ api.interceptors.request.use((config) => {
   const token = localStorage.getItem('token');
   
   // Do not attach token for login or signup to prevent 401 on invalid old tokens
-  const isAuthRequest = config.url === '/token-auth/' || (config.url === '/users/' && config.method === 'post');
+  const isAuthRequest = [
+    '/token-auth/',
+    '/auth/login/',
+    '/auth/google/url/',
+    '/auth/google/callback/',
+    '/auth/totp/confirm-setup/',
+    '/auth/totp/verify/',
+  ].some((path) => config.url === path || config.url?.endsWith(path))
+    || (config.url === '/users/' && config.method === 'post');
   
   if (token && !isAuthRequest) {
     config.headers.Authorization = `Bearer ${token}`;
@@ -25,8 +33,11 @@ api.interceptors.request.use((config) => {
 // Response Interceptor to handle global errors (e.g., 401 Unauthorized)
 api.interceptors.response.use((response) => response, (error) => {
   if (error.response && error.response.status === 401) {
-    localStorage.removeItem('token');
-    window.location.href = '/auth'; // Redirect to login on token expiration
+    const onAuthPage = window.location.pathname.startsWith('/auth');
+    if (!onAuthPage) {
+      localStorage.removeItem('token');
+      window.location.href = '/auth';
+    }
   }
   return Promise.reject(error);
 });
