@@ -3,8 +3,21 @@ import api from '../../services/api'
 import { useLanguage } from '../../LanguageContext'
 import { SENTIMENT_POSITIVE, SENTIMENT_NEGATIVE, SENTIMENT_NEUTRAL, TOPIC_UNSPECIFIED, isGeminiEngine } from '../../utils/i18nHelpers'
 import {
+  buildContinuousDailySeries,
+  emptySentimentCounts,
+  sentimentLabelToChartKey,
+  formatChartDayLabel,
+  niceAxisMax,
+  maxStackTotal,
+  toPercentStack,
+  CHART_KEY_POS,
+  CHART_KEY_NEG,
+  CHART_KEY_NEU,
+} from '../../utils/chartHelpers'
+import { DashboardChartTooltip, SentimentGradients, chartKeyToLabel } from '../../components/dashboard/DashboardCharts'
+import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, BarChart, Bar, Legend, LabelList
+  PieChart, Pie, Cell, BarChart, Bar, Legend, Label
 } from 'recharts'
 
 const COLORS = {
@@ -17,24 +30,6 @@ const COLORS = {
   blue: '#2563eb',
   indigo: '#6366f1',
   violet: '#8b5cf6',
-}
-
-const ChartTooltip = ({ active, payload, label, ts }) => {
-  if (!active || !payload?.length) return null
-  return (
-    <div className="sent-tooltip">
-      {label && <div className="sent-tooltip-label">{label}</div>}
-      <div className="sent-tooltip-rows">
-        {payload.map((entry, i) => (
-          <div key={i} className="sent-tooltip-row">
-            <span className="sent-tooltip-dot" style={{ background: entry.color || entry.fill }} />
-            <span className="sent-tooltip-name">{ts(entry.name) || entry.name}</span>
-            <span className="sent-tooltip-val mono">{entry.value}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
 }
 
 const KpiCard = ({ variant, icon, label, value, sub, progress, delay = 0 }) => (
@@ -123,8 +118,7 @@ const SentimentAnalytics = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const formatChartDay = (rawDate) =>
-    rawDate.toLocaleString(chartLocale, { month: 'short', day: 'numeric' })
+  const timelineDays = timeRange === '7d' ? 7 : timeRange === '30d' ? 30 : 14
 
   const postById = useMemo(() => {
     const map = {}
@@ -187,22 +181,30 @@ const SentimentAnalytics = () => {
   }, [filteredComments, filteredData])
 
   const pieData = useMemo(() => [
-    { name: SENTIMENT_POSITIVE, label: ts(SENTIMENT_POSITIVE), value: metrics.commentPositive, color: COLORS.pos },
-    { name: SENTIMENT_NEGATIVE, label: ts(SENTIMENT_NEGATIVE), value: metrics.commentNegative, color: COLORS.neg },
-    { name: SENTIMENT_NEUTRAL, label: ts(SENTIMENT_NEUTRAL), value: metrics.commentNeutral, color: COLORS.neu }
-  ].filter(item => item.value > 0), [metrics, ts])
+    { name: CHART_KEY_POS, value: metrics.commentPositive, color: COLORS.pos },
+    { name: CHART_KEY_NEG, value: metrics.commentNegative, color: COLORS.neg },
+    { name: CHART_KEY_NEU, value: metrics.commentNeutral, color: COLORS.neu },
+  ].filter(item => item.value > 0), [metrics])
 
   const timelineData = useMemo(() => {
-    const groups = {}
-    filteredComments.forEach(item => {
-      const key = formatChartDay(item.raw_date)
-      if (!groups[key]) {
-        groups[key] = { date: key, raw_date: item.raw_date, [SENTIMENT_POSITIVE]: 0, [SENTIMENT_NEGATIVE]: 0, [SENTIMENT_NEUTRAL]: 0 }
-      }
-      groups[key][item.sentiment]++
+    const rows = buildContinuousDailySeries({
+      items: filteredComments,
+      getDate: (item) => item.raw_date,
+      days: timelineDays,
+      seedRow: emptySentimentCounts,
+      applyItem: (row, item) => {
+        const k = sentimentLabelToChartKey(item.sentiment)
+        row[k] += 1
+        row.total += 1
+      },
     })
-    return Object.values(groups).sort((a, b) => a.raw_date - b.raw_date).slice(-15)
-  }, [filteredComments, chartLocale])
+    return rows.map((r) => ({
+      ...r,
+      date: formatChartDayLabel(r.rawDate, chartLocale),
+    }))
+  }, [filteredComments, chartLocale, timelineDays])
+
+  const timelineYMax = useMemo(() => niceAxisMax(maxStackTotal(timelineData)), [timelineData])
 
   const topicChartData = useMemo(() => {
     const groups = {}
@@ -212,19 +214,22 @@ const SentimentAnalytics = () => {
         groups[topicKey] = {
           topicKey,
           topicLabel: topicLabel(topicKey),
-          [SENTIMENT_POSITIVE]: 0,
-          [SENTIMENT_NEGATIVE]: 0,
-          [SENTIMENT_NEUTRAL]: 0,
-          total: 0
+          [CHART_KEY_POS]: 0,
+          [CHART_KEY_NEG]: 0,
+          [CHART_KEY_NEU]: 0,
+          total: 0,
         }
       }
-      if (groups[topicKey][item.sentiment] !== undefined) groups[topicKey][item.sentiment]++
-      groups[topicKey].total++
+      const k = sentimentLabelToChartKey(item.sentiment)
+      groups[topicKey][k] += 1
+      groups[topicKey].total += 1
     })
 
-    return Object.values(groups)
-      .sort((a, b) => b.total - a.total)
-      .slice(0, 5)
+    return toPercentStack(
+      Object.values(groups)
+        .sort((a, b) => b.total - a.total)
+        .slice(0, 5)
+    )
   }, [filteredComments, topicLabel, postById])
 
   const sentimentPills = [
@@ -234,7 +239,25 @@ const SentimentAnalytics = () => {
     { key: SENTIMENT_NEUTRAL, label: ts(SENTIMENT_NEUTRAL), color: COLORS.neu },
   ]
 
-  const chartMargin = { top: 12, right: isRTL ? 8 : 16, left: isRTL ? 16 : 8, bottom: 4 }
+  const chartMargin = { top: 20, right: isRTL ? 12 : 20, left: isRTL ? 20 : 12, bottom: 8 }
+
+  const topicBarTooltip = ({ active, payload, label }) => {
+    if (!active || !payload?.length) return null
+    const row = payload[0].payload
+    return (
+      <DashboardChartTooltip
+        active
+        payload={[
+          { name: CHART_KEY_POS, value: row[CHART_KEY_POS], color: COLORS.pos },
+          { name: CHART_KEY_NEG, value: row[CHART_KEY_NEG], color: COLORS.neg },
+          { name: CHART_KEY_NEU, value: row[CHART_KEY_NEU], color: COLORS.neu },
+        ].filter((p) => p.value > 0)}
+        label={`${label} · ${row.total} ${lang === 'ar' ? 'تعليق' : 'comments'}`}
+        ts={ts}
+        showPercent
+      />
+    )
+  }
   const yOrient = isRTL ? 'right' : 'left'
 
   if (loading) {
@@ -390,31 +413,35 @@ const SentimentAnalytics = () => {
             ) : (
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={timelineData} margin={chartMargin}>
-                  <defs>
-                    <linearGradient id="sentGradPos" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor={COLORS.pos} stopOpacity={0.45} />
-                      <stop offset="100%" stopColor={COLORS.pos} stopOpacity={0} />
-                    </linearGradient>
-                    <linearGradient id="sentGradNeg" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor={COLORS.neg} stopOpacity={0.4} />
-                      <stop offset="100%" stopColor={COLORS.neg} stopOpacity={0} />
-                    </linearGradient>
-                    <linearGradient id="sentGradNeu" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor={COLORS.neu} stopOpacity={0.25} />
-                      <stop offset="100%" stopColor={COLORS.neu} stopOpacity={0} />
-                    </linearGradient>
-                    <filter id="sentGlowPos" x="-20%" y="-20%" width="140%" height="140%">
-                      <feGaussianBlur stdDeviation="2" result="blur" />
-                      <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
-                    </filter>
-                  </defs>
+                  <SentimentGradients />
                   <CartesianGrid strokeDasharray="4 8" vertical={false} stroke="var(--border-light)" />
-                  <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'var(--text-tertiary)' }} dy={8} />
-                  <YAxis orientation={yOrient} axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'var(--text-tertiary)' }} width={36} />
-                  <Tooltip content={<ChartTooltip ts={ts} />} cursor={{ stroke: 'var(--border)', strokeWidth: 1, strokeDasharray: '4 4' }} />
-                  <Area type="monotone" dataKey={SENTIMENT_POSITIVE} stroke={COLORS.pos} strokeWidth={2.5} fill="url(#sentGradPos)" animationDuration={1400} activeDot={{ r: 6, stroke: '#fff', strokeWidth: 2, fill: COLORS.pos }} />
-                  <Area type="monotone" dataKey={SENTIMENT_NEGATIVE} stroke={COLORS.neg} strokeWidth={2.5} fill="url(#sentGradNeg)" animationDuration={1600} activeDot={{ r: 6, stroke: '#fff', strokeWidth: 2, fill: COLORS.neg }} />
-                  <Area type="monotone" dataKey={SENTIMENT_NEUTRAL} stroke={COLORS.neu} strokeWidth={2} fill="url(#sentGradNeu)" animationDuration={1800} activeDot={{ r: 5, stroke: '#fff', strokeWidth: 2, fill: COLORS.neu }} />
+                  <XAxis
+                    dataKey="date"
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fontSize: 11, fill: 'var(--text-tertiary)' }}
+                    dy={8}
+                    minTickGap={20}
+                    interval="preserveStartEnd"
+                  />
+                  <YAxis
+                    orientation={yOrient}
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fontSize: 11, fill: 'var(--text-tertiary)' }}
+                    width={40}
+                    allowDecimals={false}
+                    domain={[0, timelineYMax]}
+                  />
+                  <Tooltip
+                    content={({ active, payload, label }) => (
+                      <DashboardChartTooltip active={active} payload={payload} label={label} ts={ts} showPercent />
+                    )}
+                    cursor={{ stroke: 'var(--border)', strokeWidth: 1, strokeDasharray: '4 4' }}
+                  />
+                  <Area type="monotone" dataKey={CHART_KEY_POS} stackId="sent" stroke={COLORS.pos} strokeWidth={1.5} fill="url(#gradPos)" animationDuration={900} />
+                  <Area type="monotone" dataKey={CHART_KEY_NEU} stackId="sent" stroke={COLORS.neu} strokeWidth={1.5} fill="url(#gradNeu)" animationDuration={1100} />
+                  <Area type="monotone" dataKey={CHART_KEY_NEG} stackId="sent" stroke={COLORS.neg} strokeWidth={1.5} fill="url(#gradNeg)" animationDuration={1300} />
                 </AreaChart>
               </ResponsiveContainer>
             )}
@@ -439,18 +466,29 @@ const SentimentAnalytics = () => {
                         cy="50%"
                         innerRadius="58%"
                         outerRadius="82%"
-                        paddingAngle={4}
+                        paddingAngle={3}
                         dataKey="value"
                         animationBegin={200}
                         animationDuration={1200}
                         stroke="var(--bg-card)"
                         strokeWidth={3}
+                        label={({ name, percent }) => (percent >= 0.08 ? `${Math.round(percent * 100)}%` : '')}
+                        labelLine={false}
                       >
                         {pieData.map((entry, index) => (
                           <Cell key={index} fill={entry.color} />
                         ))}
                       </Pie>
-                      <Tooltip content={<ChartTooltip ts={ts} />} />
+                      <Tooltip
+                        content={({ active, payload }) => (
+                          <DashboardChartTooltip
+                            active={active}
+                            payload={payload?.map((p) => ({ ...p, name: p.payload.name }))}
+                            ts={ts}
+                            showPercent
+                          />
+                        )}
+                      />
                     </PieChart>
                   </ResponsiveContainer>
                   <div className="sent-donut-center">
@@ -492,20 +530,17 @@ const SentimentAnalytics = () => {
               <div className="sent-empty">{t('sentChartByPostEmpty')}</div>
             ) : (
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={topicChartData} layout="vertical" margin={{ top: 4, right: 28, left: 4, bottom: 4 }} barCategoryGap="20%">
-                  <defs>
-                    <linearGradient id="barPos" x1="0" y1="0" x2="1" y2="0">
-                      <stop offset="0%" stopColor={COLORS.pos} /><stop offset="100%" stopColor={COLORS.posLight} />
-                    </linearGradient>
-                    <linearGradient id="barNeg" x1="0" y1="0" x2="1" y2="0">
-                      <stop offset="0%" stopColor={COLORS.neg} /><stop offset="100%" stopColor={COLORS.negLight} />
-                    </linearGradient>
-                    <linearGradient id="barNeu" x1="0" y1="0" x2="1" y2="0">
-                      <stop offset="0%" stopColor={COLORS.neu} /><stop offset="100%" stopColor={COLORS.neuLight} />
-                    </linearGradient>
-                  </defs>
+                <BarChart data={topicChartData} layout="vertical" margin={{ top: 8, right: isRTL ? 8 : 24, left: isRTL ? 24 : 8, bottom: 4 }} barCategoryGap="22%">
+                  <SentimentGradients />
                   <CartesianGrid strokeDasharray="4 8" horizontal={false} stroke="var(--border-light)" />
-                  <XAxis type="number" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: 'var(--text-tertiary)' }} />
+                  <XAxis
+                    type="number"
+                    domain={[0, 100]}
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fontSize: 10, fill: 'var(--text-tertiary)' }}
+                    tickFormatter={(v) => `${v}%`}
+                  />
                   <YAxis
                     dataKey="topicLabel"
                     type="category"
@@ -514,25 +549,21 @@ const SentimentAnalytics = () => {
                     tickLine={false}
                     tick={{ fontSize: 10, fill: 'var(--text-primary)', fontWeight: 600 }}
                   />
-                  <Tooltip
-                    content={({ active, payload, label }) => (
-                      <ChartTooltip active={active} payload={payload} label={label} ts={ts} />
-                    )}
-                    cursor={{ fill: 'rgba(37, 99, 235, 0.06)' }}
-                  />
+                  <Tooltip content={topicBarTooltip} cursor={{ fill: 'rgba(37, 99, 235, 0.06)' }} />
                   <Legend
                     verticalAlign="top"
                     align={isRTL ? 'left' : 'right'}
                     iconType="circle"
                     iconSize={8}
                     wrapperStyle={{ fontSize: '0.75rem', paddingBottom: 8 }}
-                    formatter={(value) => ts(value)}
+                    formatter={(value) => {
+                      const map = { posPct: CHART_KEY_POS, negPct: CHART_KEY_NEG, neuPct: CHART_KEY_NEU }
+                      return ts(chartKeyToLabel(map[value] || value))
+                    }}
                   />
-                  <Bar dataKey={SENTIMENT_POSITIVE} stackId="a" fill="url(#barPos)" radius={[0, 0, 0, 0]} animationDuration={1000} />
-                  <Bar dataKey={SENTIMENT_NEGATIVE} stackId="a" fill="url(#barNeg)" animationDuration={1200} />
-                  <Bar dataKey={SENTIMENT_NEUTRAL} stackId="a" fill="url(#barNeu)" radius={[0, 6, 6, 0]} animationDuration={1400}>
-                    <LabelList dataKey="total" position="right" style={{ fontSize: 10, fill: 'var(--text-tertiary)', fontWeight: 700 }} />
-                  </Bar>
+                  <Bar dataKey={`${CHART_KEY_POS}Pct`} stackId="topic" fill="url(#barGradPos)" animationDuration={900} />
+                  <Bar dataKey={`${CHART_KEY_NEU}Pct`} stackId="topic" fill="url(#barGradNeu)" animationDuration={1100} />
+                  <Bar dataKey={`${CHART_KEY_NEG}Pct`} stackId="topic" fill="url(#barGradNeg)" radius={[0, 6, 6, 0]} animationDuration={1300} />
                 </BarChart>
               </ResponsiveContainer>
             )}

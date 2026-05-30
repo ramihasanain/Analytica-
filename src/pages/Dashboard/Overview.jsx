@@ -1,14 +1,19 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import api from '../../services/api'
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import { useDashPage, PageHero, DashKpi, DashCard, DashLoading } from '../../components/dashboard/DashboardUI'
+import {
+  CHART_KEY_POS, CHART_KEY_NEG, CHART_KEY_NEU,
+  formatChartDayLabel, niceAxisMax, maxStackTotal,
+} from '../../utils/chartHelpers'
+import { DashboardChartTooltip, SentimentGradients, SENTIMENT_CHART_COLORS, chartKeyToLabel } from '../../components/dashboard/DashboardCharts'
 
 const Overview = () => {
   const [stats, setStats] = useState(null)
   const [jobs, setJobs] = useState([])
   const [loading, setLoading] = useState(true)
-  const [chartFilter, setChartFilter] = useState('all')
-  const { t, lang, isRTL, pageProps } = useDashPage()
+  const [chartMode, setChartMode] = useState('volume')
+  const { t, lang, isRTL, ts, chartLocale, pageProps } = useDashPage()
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -34,6 +39,20 @@ const Overview = () => {
     fetchJobs()
   }, [])
 
+  const timelineChart = useMemo(() => (
+    stats?.timeline?.map((row) => ({
+      ...row,
+      label: formatChartDayLabel(row.date, chartLocale),
+    })) ?? []
+  ), [stats, chartLocale])
+
+  const volumeYMax = useMemo(() => {
+    const peak = timelineChart.reduce((m, d) => Math.max(m, d.posts, d.comments), 0)
+    return niceAxisMax(peak)
+  }, [timelineChart])
+
+  const sentimentYMax = useMemo(() => niceAxisMax(maxStackTotal(timelineChart)), [timelineChart])
+
   if (loading) {
     return (
       <div {...pageProps}>
@@ -50,7 +69,8 @@ const Overview = () => {
     )
   }
 
-  const chartMargin = { top: 10, right: isRTL ? 8 : 0, left: isRTL ? 0 : 8, bottom: 0 }
+  const chartMargin = { top: 16, right: isRTL ? 12 : 16, left: isRTL ? 16 : 12, bottom: 8 }
+  const volumeName = (key) => (key === 'posts' ? t('ovChartPosts') : t('ovChartComments'))
 
   return (
     <div {...pageProps}>
@@ -86,48 +106,107 @@ const Overview = () => {
           title={t('ovChartTitle')}
           subtitle={t('ovChartSub')}
           action={
-            <div style={{ display: 'flex', gap: '8px' }}>
+            <div className="dash-chart-mode-tabs">
               <button
                 type="button"
-                className={`badge ${chartFilter === 'all' || chartFilter === 'posts' ? 'badge-blue' : 'badge-gray'}`}
-                style={{ cursor: 'pointer', border: 'none', fontFamily: 'inherit' }}
-                onClick={() => setChartFilter(chartFilter === 'posts' ? 'all' : 'posts')}
+                className={`dash-chart-mode-tab ${chartMode === 'volume' ? 'active' : ''}`}
+                onClick={() => setChartMode('volume')}
               >
-                {t('ovChartPosts')}
+                {lang === 'ar' ? 'الحجم' : 'Volume'}
               </button>
               <button
                 type="button"
-                className="badge badge-gray"
-                style={{ cursor: 'pointer', border: 'none', fontFamily: 'inherit', opacity: chartFilter === 'posts' ? 0.5 : 1 }}
-                onClick={() => setChartFilter(chartFilter === 'comments' ? 'all' : 'comments')}
+                className={`dash-chart-mode-tab ${chartMode === 'sentiment' ? 'active' : ''}`}
+                onClick={() => setChartMode('sentiment')}
               >
-                {t('ovChartComments')}
+                {lang === 'ar' ? 'المشاعر' : 'Sentiment'}
               </button>
             </div>
           }
         >
-          <div style={{ height: 260, width: '100%' }}>
+          <div style={{ height: 280, width: '100%' }}>
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={stats.timeline} margin={chartMargin}>
-                <defs>
-                  <linearGradient id="colorPosts" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#2563eb" stopOpacity={0.45} />
-                    <stop offset="95%" stopColor="#2563eb" stopOpacity={0} />
-                  </linearGradient>
-                  <linearGradient id="colorComments" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#94a3b8" stopOpacity={0.4} />
-                    <stop offset="95%" stopColor="#94a3b8" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="4 8" vertical={false} stroke="var(--border-light)" />
-                <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: 'var(--text-tertiary)' }} dy={8} minTickGap={30} />
-                <YAxis orientation={isRTL ? 'right' : 'left'} axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: 'var(--text-tertiary)' }} width={36} />
-                <Tooltip contentStyle={{ background: 'var(--bg-card)', borderRadius: 12, border: '1px solid var(--border)', boxShadow: 'var(--shadow-lg)' }} />
-                {(chartFilter === 'all' || chartFilter === 'comments') && (
-                  <Area type="monotone" dataKey="comments" name={t('ovChartComments')} stroke="#64748b" strokeWidth={2.5} fill="url(#colorComments)" activeDot={{ r: 6, stroke: '#fff', strokeWidth: 2 }} animationDuration={1200} />
+              <AreaChart data={timelineChart} margin={chartMargin}>
+                {chartMode === 'sentiment' ? <SentimentGradients /> : (
+                  <defs>
+                    <linearGradient id="ovPosts" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#2563eb" stopOpacity={0.4} />
+                      <stop offset="100%" stopColor="#2563eb" stopOpacity={0.03} />
+                    </linearGradient>
+                    <linearGradient id="ovComments" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#8b5cf6" stopOpacity={0.35} />
+                      <stop offset="100%" stopColor="#8b5cf6" stopOpacity={0.03} />
+                    </linearGradient>
+                  </defs>
                 )}
-                {(chartFilter === 'all' || chartFilter === 'posts') && (
-                  <Area type="monotone" dataKey="posts" name={t('ovChartPosts')} stroke="#2563eb" strokeWidth={2.5} fill="url(#colorPosts)" activeDot={{ r: 6, stroke: '#fff', strokeWidth: 2 }} animationDuration={1400} />
+                <CartesianGrid strokeDasharray="4 8" vertical={false} stroke="var(--border-light)" />
+                <XAxis
+                  dataKey="label"
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fontSize: 10, fill: 'var(--text-tertiary)' }}
+                  dy={8}
+                  minTickGap={24}
+                  interval="preserveStartEnd"
+                />
+                <YAxis
+                  orientation={isRTL ? 'right' : 'left'}
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fontSize: 10, fill: 'var(--text-tertiary)' }}
+                  width={40}
+                  allowDecimals={false}
+                  domain={[0, chartMode === 'sentiment' ? sentimentYMax : volumeYMax]}
+                />
+                <Tooltip
+                  content={({ active, payload, label }) => (
+                    <DashboardChartTooltip
+                      active={active}
+                      payload={payload}
+                      label={label}
+                      ts={ts}
+                      t={chartMode === 'volume' ? volumeName : undefined}
+                      showPercent={chartMode === 'sentiment'}
+                    />
+                  )}
+                />
+                <Legend
+                  verticalAlign="top"
+                  height={28}
+                  iconType="circle"
+                  iconSize={8}
+                  wrapperStyle={{ fontSize: '0.75rem' }}
+                  formatter={(value) => (chartMode === 'volume' ? volumeName(value) : ts(chartKeyToLabel(value)))}
+                />
+                {chartMode === 'volume' ? (
+                  <>
+                    <Area
+                      type="monotone"
+                      dataKey="comments"
+                      name="comments"
+                      stroke="#8b5cf6"
+                      strokeWidth={2}
+                      fill="url(#ovComments)"
+                      activeDot={{ r: 5, stroke: '#fff', strokeWidth: 2 }}
+                      animationDuration={1000}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="posts"
+                      name="posts"
+                      stroke="#2563eb"
+                      strokeWidth={2.5}
+                      fill="url(#ovPosts)"
+                      activeDot={{ r: 5, stroke: '#fff', strokeWidth: 2 }}
+                      animationDuration={1200}
+                    />
+                  </>
+                ) : (
+                  <>
+                    <Area type="monotone" dataKey={CHART_KEY_POS} stackId="sent" stroke={SENTIMENT_CHART_COLORS[CHART_KEY_POS].stroke} strokeWidth={1.5} fill="url(#gradPos)" animationDuration={900} />
+                    <Area type="monotone" dataKey={CHART_KEY_NEU} stackId="sent" stroke={SENTIMENT_CHART_COLORS[CHART_KEY_NEU].stroke} strokeWidth={1.5} fill="url(#gradNeu)" animationDuration={1100} />
+                    <Area type="monotone" dataKey={CHART_KEY_NEG} stackId="sent" stroke={SENTIMENT_CHART_COLORS[CHART_KEY_NEG].stroke} strokeWidth={1.5} fill="url(#gradNeg)" animationDuration={1300} />
+                  </>
                 )}
               </AreaChart>
             </ResponsiveContainer>
