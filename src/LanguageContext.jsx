@@ -197,6 +197,18 @@ export const translations = {
     dbLoading: "جاري التحميل...",
     dbPlanBasic: "الخطة الأساسية",
 
+    // Profile
+    profSubtitle: "تحديث بيانات حسابك ومعلومات الشركة.",
+    profLoading: "جاري تحميل الملف الشخصي...",
+    profLoadError: "فشل في جلب بيانات الملف الشخصي.",
+    profSaveSuccess: "تم تحديث الملف الشخصي بنجاح.",
+    profSaveError: "حدث خطأ أثناء حفظ البيانات.",
+    profPasswordOptional: "تغيير كلمة المرور (اختياري)",
+    profPasswordPlaceholder: "اتركه فارغاً إذا لم ترغب بتغييره",
+    profPasswordError: "يرجى التأكد من استيفاء جميع شروط كلمة المرور قبل حفظ التغييرات.",
+    profSaving: "جاري الحفظ...",
+    profSaveBtn: "حفظ التغييرات",
+
     // Dashboard Overview
     ovDesc: "ملخص أداء صفحاتك خلال آخر 30 يوماً",
     ovLastScraped: "مزامنة فورية نشطة (متصل)",
@@ -652,6 +664,18 @@ export const translations = {
     dbLogout: "Sign Out",
     dbLoading: "Loading...",
     dbPlanBasic: "Basic Plan",
+
+    // Profile
+    profSubtitle: "Update your account and company information.",
+    profLoading: "Loading profile...",
+    profLoadError: "Failed to load profile data.",
+    profSaveSuccess: "Profile updated successfully.",
+    profSaveError: "An error occurred while saving.",
+    profPasswordOptional: "Change password (optional)",
+    profPasswordPlaceholder: "Leave blank to keep your current password",
+    profPasswordError: "Please meet all password requirements before saving changes.",
+    profSaving: "Saving...",
+    profSaveBtn: "Save changes",
 
     // Dashboard Overview
     ovDesc: "Summary of your pages' performance over the last 30 days",
