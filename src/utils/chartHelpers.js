@@ -215,6 +215,72 @@ export function piePercentLabel(total) {
     percent >= 0.08 ? `${Math.round(percent * 100)}%` : ''
 }
 
+export const CHART_KEY_LIKES = 'likes'
+export const CHART_KEY_SHARES = 'shares'
+export const CHART_KEY_INTERACTIONS = 'interactions'
+
+export function filterActiveEngagementRows(rows) {
+  if (!rows?.length) return []
+  return rows.filter((r) => (r.likes || 0) + (r.shares || 0) + (r.interactions || 0) > 0)
+}
+
+export function aggregateEngagementByWeek(rows, locale) {
+  const buckets = new Map()
+  rows.forEach((row) => {
+    const d = row.rawDate instanceof Date ? row.rawDate : new Date(row.dateKey || row.date)
+    if (Number.isNaN(d.getTime())) return
+    const weekStart = new Date(d)
+    weekStart.setHours(0, 0, 0, 0)
+    weekStart.setDate(weekStart.getDate() - weekStart.getDay())
+    const key = dayKey(weekStart)
+    if (!buckets.has(key)) {
+      buckets.set(key, {
+        date: key,
+        weekStart: new Date(weekStart),
+        likes: 0,
+        shares: 0,
+        interactions: 0,
+      })
+    }
+    const b = buckets.get(key)
+    b.likes += row.likes || 0
+    b.shares += row.shares || 0
+    b.interactions += row.interactions || 0
+  })
+  return Array.from(buckets.values())
+    .sort((a, b) => a.weekStart - b.weekStart)
+    .map((b) => {
+      const weekEnd = new Date(b.weekStart)
+      weekEnd.setDate(weekEnd.getDate() + 6)
+      const startLbl = formatChartDayLabel(b.weekStart, locale)
+      const endLbl = formatChartDayLabel(weekEnd, locale)
+      return {
+        date: b.date,
+        likes: b.likes,
+        shares: b.shares,
+        interactions: b.interactions,
+        label: startLbl === endLbl ? startLbl : `${startLbl} – ${endLbl}`,
+      }
+    })
+}
+
+/** Active engagement days; weekly roll-up when many points. */
+export function prepareEngagementChartSeries(rows, locale, { weekThreshold = 24 } = {}) {
+  const active = filterActiveEngagementRows(rows)
+  if (active.length === 0) {
+    return { data: [], granularity: 'day', sourceDays: 0 }
+  }
+  const withLabels = active.map((row) => ({
+    ...row,
+    label: row.label || formatChartDayLabel(row.rawDate || row.date, locale),
+  }))
+  if (withLabels.length > weekThreshold) {
+    const weekly = aggregateEngagementByWeek(withLabels, locale)
+    return { data: weekly, granularity: 'week', sourceDays: withLabels.length }
+  }
+  return { data: withLabels, granularity: 'day', sourceDays: withLabels.length }
+}
+
 export function filterActiveTimelineRows(rows) {
   if (!rows?.length) return []
   return rows.filter((r) => {

@@ -4,12 +4,19 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { useDashPage, PageHero, DashKpi, DashCard, DashLoading } from '../../components/dashboard/DashboardUI'
 import {
   CHART_KEY_POS, CHART_KEY_NEG, CHART_KEY_NEU,
-  niceAxisMax, maxSeriesPeak,
+  CHART_KEY_LIKES, CHART_KEY_SHARES, CHART_KEY_INTERACTIONS,
+  niceAxisMax, maxSeriesPeak, maxStackTotal,
   prepareOverviewChartSeries,
+  prepareEngagementChartSeries,
 } from '../../utils/chartHelpers'
 import { DashboardChartTooltip, SENTIMENT_CHART_COLORS, chartKeyToLabel } from '../../components/dashboard/DashboardCharts'
 
 const OV_COLORS = { posts: '#2563eb', comments: '#8b5cf6' }
+const ENG_COLORS = {
+  likes: '#ec4899',
+  interactions: '#2563eb',
+  shares: '#10b981',
+}
 
 const Overview = () => {
   const [stats, setStats] = useState(null)
@@ -48,6 +55,12 @@ const Overview = () => {
   )
   const safeChartData = chartData ?? []
 
+  const { data: engagementChartData, granularity: engGranularity, sourceDays: engSourceDays } = useMemo(
+    () => prepareEngagementChartSeries(stats?.engagement_timeline ?? [], chartLocale),
+    [stats, chartLocale]
+  )
+  const safeEngagementData = engagementChartData ?? []
+
   const timelineRangeLabel = useMemo(() => {
     if (safeChartData.length === 0) return ''
     const first = safeChartData[0].label
@@ -68,6 +81,26 @@ const Overview = () => {
       : `${sourceDays} active ${sourceDays === 1 ? 'day' : 'days'} · ${timelineRangeLabel}`
   }, [safeChartData.length, granularity, sourceDays, timelineRangeLabel, lang])
 
+  const engagementRangeLabel = useMemo(() => {
+    if (safeEngagementData.length === 0) return ''
+    const first = safeEngagementData[0].label
+    const last = safeEngagementData[safeEngagementData.length - 1].label
+    if (first === last) return first
+    return lang === 'ar' ? `من ${first} إلى ${last}` : `${first} – ${last}`
+  }, [safeEngagementData, lang])
+
+  const engagementSubtitle = useMemo(() => {
+    if (!safeEngagementData.length) return ''
+    if (engGranularity === 'week') {
+      return lang === 'ar'
+        ? `${engSourceDays} يوم نشاط · ${safeEngagementData.length} أسابيع · ${engagementRangeLabel}`
+        : `${engSourceDays} active days · ${safeEngagementData.length} weeks · ${engagementRangeLabel}`
+    }
+    return lang === 'ar'
+      ? `${engSourceDays} ${engSourceDays === 1 ? 'يوم' : 'أيام'} · ${engagementRangeLabel}`
+      : `${engSourceDays} active ${engSourceDays === 1 ? 'day' : 'days'} · ${engagementRangeLabel}`
+  }, [safeEngagementData.length, engGranularity, engSourceDays, engagementRangeLabel, lang])
+
   const volumeYMax = useMemo(() => {
     const peak = safeChartData.reduce((m, d) => Math.max(m, d.posts || 0, d.comments || 0), 0)
     return niceAxisMax(peak)
@@ -75,12 +108,24 @@ const Overview = () => {
 
   const sentimentYMax = useMemo(() => niceAxisMax(maxSeriesPeak(safeChartData)), [safeChartData])
 
+  const engagementYMax = useMemo(
+    () => niceAxisMax(maxStackTotal(safeEngagementData, [CHART_KEY_LIKES, CHART_KEY_SHARES, CHART_KEY_INTERACTIONS])),
+    [safeEngagementData]
+  )
+
   const tickInterval = safeChartData.length <= 8 ? 0 : Math.ceil(safeChartData.length / 7) - 1
+  const engTickInterval = safeEngagementData.length <= 8 ? 0 : Math.ceil(safeEngagementData.length / 7) - 1
   const chartMargin = {
     top: 16,
     right: isRTL ? 12 : 20,
     left: isRTL ? 20 : 12,
     bottom: safeChartData.length > 8 ? 36 : 12,
+  }
+  const engChartMargin = {
+    top: 16,
+    right: isRTL ? 12 : 20,
+    left: isRTL ? 20 : 12,
+    bottom: safeEngagementData.length > 8 ? 36 : 12,
   }
 
   const lineDot = (color) => ({
@@ -107,6 +152,12 @@ const Overview = () => {
   }
 
   const volumeName = (key) => (key === 'posts' ? t('ovChartPosts') : t('ovChartComments'))
+  const engagementName = (key) => {
+    if (key === CHART_KEY_LIKES) return t('ovEngChartLikes')
+    if (key === CHART_KEY_SHARES) return t('ovEngChartShares')
+    return t('ovEngChartInteractions')
+  }
+  const engSummary = stats.engagement_summary || { likes: 0, shares: 0, interactions: 0 }
 
   return (
     <div {...pageProps}>
@@ -135,6 +186,111 @@ const Overview = () => {
         ].map((s, i) => (
           <DashKpi key={i} variant={s.variant} label={s.label} value={s.val} progress={s.progress} delay={0.25 + i * 0.05} />
         ))}
+      </div>
+
+      <div className="dash-kpi-grid" style={{ marginBottom: 24 }}>
+        {[
+          { label: t('ovEngKpiLikes'), val: engSummary.likes.toLocaleString(), icon: '❤️', variant: 'red', delay: 0.05 },
+          { label: t('ovEngKpiInteractions'), val: engSummary.interactions.toLocaleString(), icon: '📊', variant: 'blue', delay: 0.1 },
+          { label: t('ovEngKpiShares'), val: engSummary.shares.toLocaleString(), icon: '🔄', variant: 'green', delay: 0.15 },
+        ].map((kpi, i) => (
+          <DashKpi key={i} variant={kpi.variant} icon={kpi.icon} label={kpi.label} value={kpi.val} delay={kpi.delay} />
+        ))}
+      </div>
+
+      <div style={{ marginBottom: 24 }}>
+      <DashCard
+        title={t('ovEngChartTitle')}
+        subtitle={engagementSubtitle || t('ovEngChartEmpty')}
+      >
+        <div className="dash-chart-box" style={{ width: '100%', minHeight: 320, height: 320 }}>
+          {safeEngagementData.length === 0 ? (
+            <div className="dash-empty">{t('ovEngChartEmpty')}</div>
+          ) : (
+            <ResponsiveContainer width="100%" height="100%" minHeight={320}>
+              <LineChart data={safeEngagementData} margin={engChartMargin}>
+                <CartesianGrid strokeDasharray="3 6" stroke="var(--border-light)" />
+                <XAxis
+                  dataKey="label"
+                  type="category"
+                  axisLine={{ stroke: 'var(--border)' }}
+                  tickLine={{ stroke: 'var(--border)' }}
+                  tick={{ fontSize: 10, fill: 'var(--text-secondary)', fontWeight: 600 }}
+                  dy={8}
+                  interval={engTickInterval}
+                  angle={safeEngagementData.length > 8 ? -28 : 0}
+                  textAnchor={safeEngagementData.length > 8 ? 'end' : 'middle'}
+                  height={safeEngagementData.length > 8 ? 52 : 32}
+                />
+                <YAxis
+                  orientation={isRTL ? 'right' : 'left'}
+                  axisLine={{ stroke: 'var(--border)' }}
+                  tickLine={false}
+                  tick={{ fontSize: 10, fill: 'var(--text-tertiary)' }}
+                  width={48}
+                  allowDecimals={false}
+                  domain={[0, Math.max(engagementYMax, 1)]}
+                  label={{
+                    value: lang === 'ar' ? 'العدد' : 'Count',
+                    angle: -90,
+                    position: isRTL ? 'insideRight' : 'insideLeft',
+                    style: { fontSize: 10, fill: 'var(--text-tertiary)' },
+                  }}
+                />
+                <Tooltip
+                  content={({ active, payload, label }) => (
+                    <DashboardChartTooltip
+                      active={active}
+                      payload={payload}
+                      label={engGranularity === 'week' && lang === 'ar' ? `أسبوع: ${label}` : engGranularity === 'week' ? `Week: ${label}` : label}
+                      formatSeriesName={engagementName}
+                    />
+                  )}
+                  cursor={{ stroke: 'var(--border)', strokeWidth: 1, strokeDasharray: '4 4' }}
+                />
+                <Legend
+                  verticalAlign="top"
+                  height={28}
+                  iconType="circle"
+                  iconSize={8}
+                  wrapperStyle={{ fontSize: '0.75rem' }}
+                  formatter={engagementName}
+                />
+                <Line
+                  type="monotone"
+                  dataKey={CHART_KEY_INTERACTIONS}
+                  name={CHART_KEY_INTERACTIONS}
+                  stroke={ENG_COLORS.interactions}
+                  strokeWidth={2.5}
+                  dot={lineDot(ENG_COLORS.interactions)}
+                  activeDot={{ r: 6, fill: ENG_COLORS.interactions, stroke: '#fff', strokeWidth: 2 }}
+                  animationDuration={800}
+                />
+                <Line
+                  type="monotone"
+                  dataKey={CHART_KEY_LIKES}
+                  name={CHART_KEY_LIKES}
+                  stroke={ENG_COLORS.likes}
+                  strokeWidth={2.5}
+                  dot={lineDot(ENG_COLORS.likes)}
+                  activeDot={{ r: 6, fill: ENG_COLORS.likes, stroke: '#fff', strokeWidth: 2 }}
+                  animationDuration={1000}
+                />
+                <Line
+                  type="monotone"
+                  dataKey={CHART_KEY_SHARES}
+                  name={CHART_KEY_SHARES}
+                  stroke={ENG_COLORS.shares}
+                  strokeWidth={2.5}
+                  dot={lineDot(ENG_COLORS.shares)}
+                  activeDot={{ r: 6, fill: ENG_COLORS.shares, stroke: '#fff', strokeWidth: 2 }}
+                  animationDuration={1200}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+      </DashCard>
       </div>
 
       <div className="dash-grid-2">

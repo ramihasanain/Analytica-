@@ -471,7 +471,7 @@ const Posts = () => {
                   )}
                 </div>
 
-                {/* Expanded Comments and Reactions */}
+                {/* Expanded comments */}
                 {expandedPost === post.id && (
                   <div style={{ marginTop: '20px', paddingTop: '20px', borderTop: '1px solid var(--border)' }}>
                     
@@ -496,22 +496,6 @@ const Posts = () => {
                       <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-secondary)' }}>{t('postsLoadingDetails')}</div>
                     ) : (
                       <>
-                        {/* Reactions */}
-                        <div style={{ marginBottom: '24px', textAlign: isRTL ? 'right' : 'left' }}>
-                          <div style={{ fontSize: '.85rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '12px' }}>
-                            👍 {t('postsReactions')} ({expandedPostData[post.id].reactions.length})
-                          </div>
-                          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', flexDirection: isRTL ? 'row' : 'row-reverse' }}>
-                            {expandedPostData[post.id].reactions.map(r => (
-                              <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'var(--bg)', padding: '6px 12px', borderRadius: '20px', fontSize: '.82rem', border: '1px solid var(--border-light)', boxShadow: '0 1px 2px rgba(0,0,0,0.02)', flexDirection: isRTL ? 'row' : 'row-reverse' }}>
-                                <span>{r.reaction_type === 'LOVE' ? '❤️' : r.reaction_type === 'HAHA' ? '😂' : r.reaction_type === 'WOW' ? '😮' : r.reaction_type === 'SAD' ? '😢' : r.reaction_type === 'ANGRY' ? '😠' : '👍'}</span>
-                                <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{r.author_name}</span>
-                              </div>
-                            ))}
-                            {expandedPostData[post.id].reactions.length === 0 && <span style={{ fontSize: '.8rem', color: 'var(--text-tertiary)' }}>{t('postsNoReactions')}</span>}
-                          </div>
-                        </div>
-
                         {/* Comments */}
                         <div style={{ textAlign: isRTL ? 'right' : 'left' }}>
                           <div style={{ fontSize: '.85rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '14px' }}>
