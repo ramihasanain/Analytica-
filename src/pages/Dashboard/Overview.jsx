@@ -42,44 +42,45 @@ const Overview = () => {
     fetchJobs()
   }, [])
 
-  const { chartData, granularity, sourceDays } = useMemo(
+  const { data: chartData, granularity, sourceDays } = useMemo(
     () => prepareOverviewChartSeries(stats?.timeline ?? [], chartLocale),
     [stats, chartLocale]
   )
+  const safeChartData = chartData ?? []
 
   const timelineRangeLabel = useMemo(() => {
-    if (chartData.length === 0) return ''
-    const first = chartData[0].label
-    const last = chartData[chartData.length - 1].label
+    if (safeChartData.length === 0) return ''
+    const first = safeChartData[0].label
+    const last = safeChartData[safeChartData.length - 1].label
     if (first === last) return first
     return lang === 'ar' ? `من ${first} إلى ${last}` : `${first} – ${last}`
-  }, [chartData, lang])
+  }, [safeChartData, lang])
 
   const chartSubtitle = useMemo(() => {
-    if (!chartData.length) return ''
+    if (!safeChartData.length) return ''
     if (granularity === 'week') {
       return lang === 'ar'
-        ? `${sourceDays} يوم نشاط · ${chartData.length} أسابيع · ${timelineRangeLabel}`
-        : `${sourceDays} active days · ${chartData.length} weeks · ${timelineRangeLabel}`
+        ? `${sourceDays} يوم نشاط · ${safeChartData.length} أسابيع · ${timelineRangeLabel}`
+        : `${sourceDays} active days · ${safeChartData.length} weeks · ${timelineRangeLabel}`
     }
     return lang === 'ar'
       ? `${sourceDays} ${sourceDays === 1 ? 'يوم' : 'أيام'} بها بيانات · ${timelineRangeLabel}`
       : `${sourceDays} active ${sourceDays === 1 ? 'day' : 'days'} · ${timelineRangeLabel}`
-  }, [chartData.length, granularity, sourceDays, timelineRangeLabel, lang])
+  }, [safeChartData.length, granularity, sourceDays, timelineRangeLabel, lang])
 
   const volumeYMax = useMemo(() => {
-    const peak = chartData.reduce((m, d) => Math.max(m, d.posts || 0, d.comments || 0), 0)
+    const peak = safeChartData.reduce((m, d) => Math.max(m, d.posts || 0, d.comments || 0), 0)
     return niceAxisMax(peak)
-  }, [chartData])
+  }, [safeChartData])
 
-  const sentimentYMax = useMemo(() => niceAxisMax(maxSeriesPeak(chartData)), [chartData])
+  const sentimentYMax = useMemo(() => niceAxisMax(maxSeriesPeak(safeChartData)), [safeChartData])
 
-  const tickInterval = chartData.length <= 8 ? 0 : Math.ceil(chartData.length / 7) - 1
+  const tickInterval = safeChartData.length <= 8 ? 0 : Math.ceil(safeChartData.length / 7) - 1
   const chartMargin = {
     top: 16,
     right: isRTL ? 12 : 20,
     left: isRTL ? 20 : 12,
-    bottom: chartData.length > 8 ? 36 : 12,
+    bottom: safeChartData.length > 8 ? 36 : 12,
   }
 
   const lineDot = (color) => ({
@@ -160,11 +161,11 @@ const Overview = () => {
           }
         >
           <div className="dash-chart-box" style={{ width: '100%', minHeight: 300, height: 300 }}>
-            {chartData.length === 0 ? (
+            {safeChartData.length === 0 ? (
               <div className="dash-empty">{t('ovChartSubEmpty')}</div>
             ) : (
               <ResponsiveContainer width="100%" height="100%" minHeight={300}>
-                <LineChart data={chartData} margin={chartMargin}>
+                <LineChart data={safeChartData} margin={chartMargin}>
                   <CartesianGrid strokeDasharray="3 6" stroke="var(--border-light)" />
                   <XAxis
                     dataKey="label"
@@ -174,9 +175,9 @@ const Overview = () => {
                     tick={{ fontSize: 10, fill: 'var(--text-secondary)', fontWeight: 600 }}
                     dy={8}
                     interval={tickInterval}
-                    angle={chartData.length > 8 ? -28 : 0}
-                    textAnchor={chartData.length > 8 ? 'end' : 'middle'}
-                    height={chartData.length > 8 ? 52 : 32}
+                    angle={safeChartData.length > 8 ? -28 : 0}
+                    textAnchor={safeChartData.length > 8 ? 'end' : 'middle'}
+                    height={safeChartData.length > 8 ? 52 : 32}
                   />
                   <YAxis
                     orientation={isRTL ? 'right' : 'left'}

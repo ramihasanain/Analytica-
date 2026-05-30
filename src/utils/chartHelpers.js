@@ -157,6 +157,7 @@ export function buildDataBoundedDailySeries({
 }
 
 export function maxSeriesPeak(rows, keys = [CHART_KEY_POS, CHART_KEY_NEG, CHART_KEY_NEU]) {
+  if (!rows?.length) return 0
   return rows.reduce((max, row) => {
     const peak = keys.reduce((m, k) => Math.max(m, row[k] || 0), 0)
     return Math.max(max, peak)
@@ -188,6 +189,7 @@ export function piePercentLabel(total) {
 }
 
 export function filterActiveTimelineRows(rows) {
+  if (!rows?.length) return []
   return rows.filter((r) => {
     const volume = (r.posts || 0) + (r.comments || 0)
     const sentiment = (r.pos || 0) + (r.neg || 0) + (r.neu || 0)
