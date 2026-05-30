@@ -46,6 +46,14 @@ const Overview = () => {
     })) ?? []
   ), [stats, chartLocale])
 
+  const timelineRangeLabel = useMemo(() => {
+    if (timelineChart.length === 0) return ''
+    const first = timelineChart[0].label
+    const last = timelineChart[timelineChart.length - 1].label
+    if (first === last) return first
+    return lang === 'ar' ? `من ${first} إلى ${last}` : `${first} – ${last}`
+  }, [timelineChart, lang])
+
   const volumeYMax = useMemo(() => {
     const peak = timelineChart.reduce((m, d) => Math.max(m, d.posts, d.comments), 0)
     return niceAxisMax(peak)
@@ -104,7 +112,11 @@ const Overview = () => {
       <div className="dash-grid-2">
         <DashCard
           title={t('ovChartTitle')}
-          subtitle={t('ovChartSub')}
+          subtitle={
+            timelineRangeLabel
+              ? (lang === 'ar' ? `منشورات + تعليقات · ${timelineRangeLabel}` : `Posts + comments · ${timelineRangeLabel}`)
+              : t('ovChartSubEmpty')
+          }
           action={
             <div className="dash-chart-mode-tabs">
               <button
@@ -125,6 +137,9 @@ const Overview = () => {
           }
         >
           <div className="dash-chart-box" style={{ width: '100%', minHeight: 280, height: 280 }}>
+            {timelineChart.length === 0 ? (
+              <div className="dash-empty">{t('ovChartSubEmpty')}</div>
+            ) : (
             <ResponsiveContainer width="100%" height="100%" minHeight={280}>
               <AreaChart data={timelineChart} margin={chartMargin}>
                 {chartMode === 'sentiment' ? <SentimentGradients /> : (
@@ -139,24 +154,24 @@ const Overview = () => {
                     </linearGradient>
                   </defs>
                 )}
-                <CartesianGrid strokeDasharray="4 8" vertical={false} stroke="var(--border-light)" />
+                <CartesianGrid strokeDasharray="3 6" stroke="var(--border-light)" />
                 <XAxis
                   dataKey="label"
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fontSize: 10, fill: 'var(--text-tertiary)' }}
+                  axisLine={{ stroke: 'var(--border)' }}
+                  tickLine={{ stroke: 'var(--border)' }}
+                  tick={{ fontSize: 10, fill: 'var(--text-secondary)', fontWeight: 600 }}
                   dy={8}
-                  minTickGap={24}
-                  interval="preserveStartEnd"
+                  minTickGap={12}
+                  interval={timelineChart.length <= 12 ? 0 : 'preserveStartEnd'}
                 />
                 <YAxis
                   orientation={isRTL ? 'right' : 'left'}
-                  axisLine={false}
+                  axisLine={{ stroke: 'var(--border)' }}
                   tickLine={false}
                   tick={{ fontSize: 10, fill: 'var(--text-tertiary)' }}
                   width={40}
                   allowDecimals={false}
-                  domain={[0, chartMode === 'sentiment' ? sentimentYMax : volumeYMax]}
+                  domain={[0, Math.max(chartMode === 'sentiment' ? sentimentYMax : volumeYMax, 1)]}
                 />
                 <Tooltip
                   content={({ active, payload, label }) => (
@@ -210,6 +225,7 @@ const Overview = () => {
                 )}
               </AreaChart>
             </ResponsiveContainer>
+            )}
           </div>
         </DashCard>
 
