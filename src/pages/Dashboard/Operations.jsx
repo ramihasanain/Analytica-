@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import api from '../../services/api'
 import { useLanguage } from '../../LanguageContext'
+import { isGeminiEngine, isLocalTrainedEngine } from '../../utils/i18nHelpers'
 
 const Operations = () => {
   const [logs, setLogs] = useState([])
@@ -10,7 +11,7 @@ const Operations = () => {
   const [typeFilter, setTypeFilter] = useState('all')
   const [engineFilter, setEngineFilter] = useState('all')
   const [selectedItem, setSelectedItem] = useState(null) // For modal
-  const { lang, isRTL } = useLanguage()
+  const { t, lang, isRTL, ts } = useLanguage()
 
   const fetchOperationsLog = async () => {
     try {
@@ -19,7 +20,7 @@ const Operations = () => {
       setLogs(res.data)
     } catch (err) {
       console.error('Error fetching operations log:', err)
-      setError(lang === 'ar' ? 'فشل تحميل سجل العمليات' : 'Failed to load operations log')
+      setError(t('opsLoadError'))
     } finally {
       setLoading(false)
     }
@@ -31,7 +32,7 @@ const Operations = () => {
 
   // Calculate statistics
   const totalItems = logs.length
-  const aiCount = logs.filter(l => l.engine_used && (l.engine_used.toLowerCase().includes('gemini') || l.engine_used.toLowerCase().includes('ai'))).length
+  const aiCount = logs.filter(l => isGeminiEngine(l.engine_used)).length
   const localCount = totalItems - aiCount
   const aiPercentage = totalItems > 0 ? Math.round((aiCount / totalItems) * 100) : 0
   const localPercentage = totalItems > 0 ? Math.round((localCount / totalItems) * 100) : 0
@@ -42,53 +43,32 @@ const Operations = () => {
     const typeMatch = typeFilter === 'all' || log.media_type === typeFilter
     
     let engineMatch = true
-    if (engineFilter !== 'all') {
-      if (engineFilter === 'gemini') {
-        engineMatch = log.engine_used.toLowerCase().includes('gemini') || log.engine_used.toLowerCase().includes('ai')
-      } else if (engineFilter === 'marbert') {
-        engineMatch = log.engine_used.toLowerCase().includes('marbert')
-      } else if (engineFilter === 'lexicon') {
-        engineMatch = log.engine_used.toLowerCase().includes('lexicon') || log.engine_used.toLowerCase().includes('local')
-      } else if (engineFilter === 'rule') {
-        engineMatch = log.engine_used.toLowerCase().includes('rule') || log.engine_used.toLowerCase().includes('system')
-      }
+    if (engineFilter === 'ai') {
+      engineMatch = isGeminiEngine(log.engine_used)
+    } else if (engineFilter === 'local') {
+      engineMatch = isLocalTrainedEngine(log.engine_used)
     }
     
     return contentMatch && typeMatch && engineMatch
   })
 
-  // Format engine badges nicely
+  const getEngineCategoryLabel = (engine) =>
+    isGeminiEngine(engine) ? t('opsEngineCategoryAi') : t('opsEngineCategoryLocal')
+
   const getEngineBadgeStyles = (engine) => {
-    const lower = (engine || '').toLowerCase()
-    if (lower.includes('gemini') || lower.includes('ai')) {
+    if (isGeminiEngine(engine)) {
       return {
         background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.08) 0%, rgba(139, 92, 246, 0.08) 100%)',
         color: '#8b5cf6',
         border: '1px solid rgba(139, 92, 246, 0.2)',
-        icon: '🧠'
-      }
-    }
-    if (lower.includes('marbert')) {
-      return {
-        background: 'rgba(236, 72, 153, 0.08)',
-        color: '#ec4899',
-        border: '1px solid rgba(236, 72, 153, 0.2)',
-        icon: '💻'
-      }
-    }
-    if (lower.includes('lexicon')) {
-      return {
-        background: 'rgba(16, 185, 129, 0.08)',
-        color: '#10b981',
-        border: '1px solid rgba(16, 185, 129, 0.2)',
-        icon: '📖'
+        icon: '🧠',
       }
     }
     return {
-      background: 'rgba(107, 114, 128, 0.08)',
-      color: '#6b7280',
-      border: '1px solid rgba(107, 114, 128, 0.2)',
-      icon: '⚙️'
+      background: 'rgba(16, 185, 129, 0.08)',
+      color: '#10b981',
+      border: '1px solid rgba(16, 185, 129, 0.2)',
+      icon: '💻',
     }
   }
 
@@ -108,17 +88,11 @@ const Operations = () => {
       {/* Header */}
       <div style={{ marginBottom: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px', flexDirection: isRTL ? 'row' : 'row-reverse' }}>
         <div>
-          <h1 style={{ fontSize: '1.6rem', marginBottom: '6px' }}>
-            {lang === 'ar' ? 'عمليات السحب والتحليل' : 'Scrapes & Audits Operations'}
-          </h1>
-          <p style={{ fontSize: '.92rem', color: 'var(--text-secondary)' }}>
-            {lang === 'ar' 
-              ? 'سجل تتبع تفصيلي لمصادر التصنيف ونوعية المحركات والنماذج المستخدمة لكل منشور أو تعليق.' 
-              : 'Detailed tracking audit of the models, engines, and classification logic applied to each item.'}
-          </p>
+          <h1 style={{ fontSize: '1.6rem', marginBottom: '6px' }}>{t('opsTitle')}</h1>
+          <p style={{ fontSize: '.92rem', color: 'var(--text-secondary)' }}>{t('opsSubtitle')}</p>
         </div>
         <button onClick={fetchOperationsLog} className="btn" style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg-card)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', outline: 'none' }}>
-          🔄 {lang === 'ar' ? 'تحديث السجل' : 'Refresh Log'}
+          🔄 {t('opsRefresh')}
         </button>
       </div>
 
@@ -134,39 +108,39 @@ const Operations = () => {
           {/* Card 1: Total Scrapes */}
           <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', padding: '20px 24px', borderRadius: '16px', animation: 'fadeIn 0.4s ease-out' }}>
             <div style={{ fontSize: '.82rem', fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: '8px' }}>
-              {lang === 'ar' ? 'إجمالي السجلات المسحوبة' : 'Total Items Processed'}
+              {t('opsTotalItems')}
             </div>
             <div className="mono" style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '4px' }}>
               {totalItems}
             </div>
             <span style={{ fontSize: '.75rem', color: 'var(--text-secondary)' }}>
-              {lang === 'ar' ? 'منشورات وتعليقات معالجة بنجاح' : 'Processed posts & comments'}
+              {t('opsTotalDesc')}
             </span>
           </div>
 
           {/* Card 2: AI-Powered */}
           <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', padding: '20px 24px', borderRadius: '16px', animation: 'fadeIn 0.5s ease-out' }}>
             <div style={{ fontSize: '.82rem', fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: '8px' }}>
-              {lang === 'ar' ? 'اعتماد الذكاء الاصطناعي' : 'AI Engine Coverage'}
+              {t('opsAiCoverage')}
             </div>
             <div className="mono" style={{ fontSize: '2rem', fontWeight: 800, color: '#8b5cf6', marginBottom: '4px' }}>
               {aiPercentage}%
             </div>
             <span style={{ fontSize: '.75rem', color: 'var(--text-secondary)' }}>
-              {lang === 'ar' ? `تم عبر Gemini (${aiCount} عملية)` : `Handled by Gemini (${aiCount} tasks)`}
+              {t('opsAiDesc', { count: aiCount })}
             </span>
           </div>
 
           {/* Card 3: Local Engine */}
           <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', padding: '20px 24px', borderRadius: '16px', animation: 'fadeIn 0.6s ease-out' }}>
             <div style={{ fontSize: '.82rem', fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: '8px' }}>
-              {lang === 'ar' ? 'محركات المعالجة المحلية' : 'Local Engine Coverage'}
+              {t('opsLocalCoverage')}
             </div>
             <div className="mono" style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--blue)', marginBottom: '4px' }}>
               {localPercentage}%
             </div>
             <span style={{ fontSize: '.75rem', color: 'var(--text-secondary)' }}>
-              {lang === 'ar' ? `المحلي والمطابقات الفورية (${localCount} عملية)` : `Marbert & Lexicon local rules (${localCount} tasks)`}
+              {t('opsLocalDesc', { count: localCount })}
             </span>
           </div>
         </div>
@@ -189,7 +163,7 @@ const Operations = () => {
           {/* Search bar */}
           <input
             type="text"
-            placeholder={lang === 'ar' ? '🔍 ابحث بالنص أو المعرّف (ID)...' : '🔍 Search by text or ID...'}
+            placeholder={`🔍 ${t('opsSearchPlaceholder')}`}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             style={{ 
@@ -212,9 +186,9 @@ const Operations = () => {
             onChange={(e) => setTypeFilter(e.target.value)}
             style={{ padding: '9px 16px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text-primary)', fontFamily: isRTL ? 'var(--font-ar)' : 'var(--font-en)', fontSize: '.85rem', fontWeight: 600, outline: 'none', cursor: 'pointer' }}
           >
-            <option value="all">{lang === 'ar' ? '📱 جميع أنواع المحتوى' : '📱 All Content Types'}</option>
-            <option value="post">{lang === 'ar' ? '📝 منشور أصلي' : '📝 Parent Post'}</option>
-            <option value="comment">{lang === 'ar' ? '💬 تعليق' : '💬 Comment'}</option>
+            <option value="all">📱 {t('opsFilterAllTypes')}</option>
+            <option value="post">📝 {t('opsFilterPost')}</option>
+            <option value="comment">💬 {t('opsFilterComment')}</option>
           </select>
 
           {/* Engine Filter */}
@@ -223,11 +197,9 @@ const Operations = () => {
             onChange={(e) => setEngineFilter(e.target.value)}
             style={{ padding: '9px 16px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text-primary)', fontFamily: isRTL ? 'var(--font-ar)' : 'var(--font-en)', fontSize: '.85rem', fontWeight: 600, outline: 'none', cursor: 'pointer' }}
           >
-            <option value="all">{lang === 'ar' ? '⚙️ جميع محركات المعالجة' : '⚙️ All Processing Engines'}</option>
-            <option value="gemini">{lang === 'ar' ? '🧠 ذكاء اصطناعي (Gemini)' : '🧠 AI Engine (Gemini)'}</option>
-            <option value="marbert">{lang === 'ar' ? '💻 محلي (MARBERT)' : '💻 Local (MARBERT)'}</option>
-            <option value="lexicon">{lang === 'ar' ? '📖 قاموس محلي (Lexicon)' : '📖 Local Lexicon'}</option>
-            <option value="rule">{lang === 'ar' ? '⚙️ قواعد النظام الثابتة' : '⚙️ System Rule'}</option>
+            <option value="all">⚙️ {t('opsFilterAllEngines')}</option>
+            <option value="ai">🧠 {t('opsFilterAi')}</option>
+            <option value="local">💻 {t('opsFilterLocalModel')}</option>
           </select>
         </div>
       )}
@@ -236,7 +208,7 @@ const Operations = () => {
       {loading ? (
         <div style={{ padding: '60px', textAlign: 'center', color: 'var(--text-secondary)' }}>
           <span style={{ fontSize: '1.2rem', display: 'block', marginBottom: '10px' }}>⏳</span>
-          {lang === 'ar' ? 'جاري تحميل سجل العمليات والمحركات...' : 'Loading operations log & lineages...'}
+          {t('opsLoading')}
         </div>
       ) : (
         <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '16px', overflow: 'hidden' }}>
@@ -244,13 +216,13 @@ const Operations = () => {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.88rem', textAlign: isRTL ? 'right' : 'left' }}>
               <thead>
                 <tr style={{ background: 'var(--bg-elevated)', borderBottom: '1px solid var(--border)', color: 'var(--text-secondary)' }}>
-                  <th style={{ padding: '16px 20px', fontWeight: 700 }}>{lang === 'ar' ? 'المعرّف (ID)' : 'ID'}</th>
-                  <th style={{ padding: '16px 20px', fontWeight: 700 }}>{lang === 'ar' ? 'نوع المحتوى' : 'Type'}</th>
-                  <th style={{ padding: '16px 20px', fontWeight: 700 }}>{lang === 'ar' ? 'النص والمعاينة' : 'Content Snippet'}</th>
-                  <th style={{ padding: '16px 20px', fontWeight: 700 }}>{lang === 'ar' ? 'محرك المعالجة' : 'Engine Used'}</th>
-                  <th style={{ padding: '16px 20px', fontWeight: 700 }}>{lang === 'ar' ? 'المشاعر' : 'Sentiment'}</th>
-                  <th style={{ padding: '16px 20px', fontWeight: 700 }}>{lang === 'ar' ? 'الموضوع' : 'Topic'}</th>
-                  <th style={{ padding: '16px 20px', fontWeight: 700 }}>{lang === 'ar' ? 'تاريخ النشر' : 'Posted At'}</th>
+                  <th style={{ padding: '16px 20px', fontWeight: 700 }}>{t('opsTableId')}</th>
+                  <th style={{ padding: '16px 20px', fontWeight: 700 }}>{t('opsTableType')}</th>
+                  <th style={{ padding: '16px 20px', fontWeight: 700 }}>{t('opsTableContent')}</th>
+                  <th style={{ padding: '16px 20px', fontWeight: 700 }}>{t('opsTableEngine')}</th>
+                  <th style={{ padding: '16px 20px', fontWeight: 700 }}>{t('opsTableSentiment')}</th>
+                  <th style={{ padding: '16px 20px', fontWeight: 700 }}>{t('opsTableTopic')}</th>
+                  <th style={{ padding: '16px 20px', fontWeight: 700 }}>{t('opsTableDate')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -265,11 +237,11 @@ const Operations = () => {
                       <td style={{ padding: '16px 20px', whiteSpace: 'nowrap' }}>
                         {log.media_type === 'post' ? (
                           <span className="badge badge-gray" style={{ fontSize: '.75rem', fontWeight: 700 }}>
-                            📝 {lang === 'ar' ? 'منشور أصلي' : 'Parent Post'}
+                            📝 {t('opsFilterPost')}
                           </span>
                         ) : (
                           <span className="badge badge-blue" style={{ fontSize: '.75rem', color: 'var(--blue)', background: 'var(--blue-soft)', fontWeight: 700 }}>
-                            💬 {lang === 'ar' ? 'تعليق' : 'Comment'}
+                            💬 {t('opsFilterComment')}
                           </span>
                         )}
                       </td>
@@ -294,14 +266,14 @@ const Operations = () => {
                           border: badge.border
                         }}>
                           <span>{badge.icon}</span>
-                          <span>{log.engine_used}</span>
+                          <span title={log.engine_used}>{getEngineCategoryLabel(log.engine_used)}</span>
                         </span>
                       </td>
                       
                       {/* Sentiment */}
                       <td style={{ padding: '16px 20px', whiteSpace: 'nowrap' }}>
                         <span className={`badge ${log.sentiment === 'إيجابي' ? 'badge-green' : log.sentiment === 'سلبي' ? 'badge-red' : 'badge-amber'}`} style={{ fontSize: '.78rem', fontWeight: 700 }}>
-                          {log.sentiment}
+                          {ts(log.sentiment)}
                         </span>
                       </td>
                       
@@ -324,7 +296,7 @@ const Operations = () => {
                 {filteredLogs.length === 0 && (
                   <tr>
                     <td colSpan="7" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                      {lang === 'ar' ? 'لا توجد سجلات مطابقة للبحث أو الفلتر حالياً.' : 'No matching audit records found.'}
+                      {t('opsNoRecords')}
                     </td>
                   </tr>
                 )}
@@ -363,7 +335,7 @@ const Operations = () => {
           }} onClick={(e) => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexDirection: isRTL ? 'row' : 'row-reverse' }}>
               <h2 style={{ fontSize: '1.25rem', margin: 0, fontWeight: 800 }}>
-                🔍 {lang === 'ar' ? `تفاصيل تشخيص السجل #${selectedItem.id}` : `Diagnostics details #${selectedItem.id}`}
+                🔍 {t('opsDiagTitle')} #{selectedItem.id}
               </h2>
               <button onClick={() => setSelectedItem(null)} style={{ border: 'none', background: 'transparent', fontSize: '1.5rem', cursor: 'pointer', color: 'var(--text-secondary)', outline: 'none' }}>&times;</button>
             </div>
@@ -372,7 +344,7 @@ const Operations = () => {
               {/* Content Box */}
               <div style={{ background: 'var(--bg)', border: '1px solid var(--border-light)', padding: '16px', borderRadius: '12px' }}>
                 <div style={{ fontSize: '.75rem', color: 'var(--text-tertiary)', fontWeight: 700, marginBottom: '6px', textTransform: 'uppercase' }}>
-                  {lang === 'ar' ? 'المحتوى الكامل' : 'Full Content'}
+                  {t('opsFullContent')}
                 </div>
                 <p style={{ margin: 0, fontSize: '.92rem', color: 'var(--text-primary)', lineHeight: 1.8, fontWeight: 500 }}>
                   {selectedItem.content}
@@ -383,7 +355,7 @@ const Operations = () => {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                 <div>
                   <div style={{ fontSize: '.75rem', color: 'var(--text-tertiary)', fontWeight: 700, marginBottom: '6px', textTransform: 'uppercase' }}>
-                    {lang === 'ar' ? 'نوع السجل' : 'Media Type'}
+                    {t('opsMediaType')}
                   </div>
                   <span style={{ fontSize: '.85rem', fontWeight: 700, color: 'var(--text-primary)' }}>
                     {selectedItem.media_type === 'post' ? '📝 منشور أصلي' : '💬 تعليق صفحة'}
@@ -391,7 +363,7 @@ const Operations = () => {
                 </div>
                 <div>
                   <div style={{ fontSize: '.75rem', color: 'var(--text-tertiary)', fontWeight: 700, marginBottom: '6px', textTransform: 'uppercase' }}>
-                    {lang === 'ar' ? 'الموضوع الفعلي' : 'Assigned Topic'}
+                    {t('opsAssignedTopic')}
                   </div>
                   <span style={{ fontSize: '.85rem', fontWeight: 700, color: 'var(--text-primary)' }}>
                     {selectedItem.topic ? `📌 ${selectedItem.topic}` : '—'}
@@ -402,7 +374,7 @@ const Operations = () => {
               {/* Engine Lineage Box */}
               <div style={{ background: 'var(--bg)', border: '1px solid var(--border-light)', padding: '16px', borderRadius: '12px' }}>
                 <div style={{ fontSize: '.75rem', color: 'var(--text-tertiary)', fontWeight: 700, marginBottom: '8px', textTransform: 'uppercase' }}>
-                  {lang === 'ar' ? 'سلسلة المعالجة ونموذج التحليل' : 'Processing Lineage & Model Audit'}
+                  {t('opsLineage')}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px', flexDirection: isRTL ? 'row' : 'row-reverse' }}>
                   <span style={{
@@ -417,22 +389,21 @@ const Operations = () => {
                     color: getEngineBadgeStyles(selectedItem.engine_used).color,
                     border: getEngineBadgeStyles(selectedItem.engine_used).border
                   }}>
-                    {getEngineBadgeStyles(selectedItem.engine_used).icon} {selectedItem.engine_used}
+                    {getEngineBadgeStyles(selectedItem.engine_used).icon}{' '}
+                    <span title={selectedItem.engine_used}>{getEngineCategoryLabel(selectedItem.engine_used)}</span>
                   </span>
                   <span className={`badge ${selectedItem.sentiment === 'إيجابي' ? 'badge-green' : selectedItem.sentiment === 'سلبي' ? 'badge-red' : 'badge-amber'}`} style={{ fontSize: '.85rem', fontWeight: 700 }}>
-                    {selectedItem.sentiment}
+                    {ts(selectedItem.sentiment)}
                   </span>
                 </div>
                 <p style={{ margin: 0, fontSize: '.8rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-                  {lang === 'ar' 
-                    ? `اعتمد محرك التحليل على هذا النموذج المحدد لتحديد درجة مشاعر المحتوى وتصنيف الموضوع بدقة متناهية وبنسبة ثقة بلغت ${(selectedItem.confidence * 100).toFixed(0)}%.` 
-                    : `The classification pipeline routed this content to the specified model with an evaluation confidence of ${(selectedItem.confidence * 100).toFixed(0)}%.`}
+                  {t('opsDiagExplain', { pct: (selectedItem.confidence * 100).toFixed(0) })}
                 </p>
               </div>
 
               {/* Close Button */}
               <button onClick={() => setSelectedItem(null)} className="btn btn-blue" style={{ width: '100%', padding: '10px', borderRadius: '8px', fontWeight: 700, cursor: 'pointer', outline: 'none' }}>
-                {lang === 'ar' ? 'إغلاق نافذة التشخيص' : 'Close Diagnostics'}
+                {t('opsClose')}
               </button>
             </div>
           </div>

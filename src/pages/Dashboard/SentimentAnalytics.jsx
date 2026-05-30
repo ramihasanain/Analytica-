@@ -1,11 +1,14 @@
 import { useState, useEffect } from 'react'
 import api from '../../services/api'
+import { useLanguage } from '../../LanguageContext'
+import { SENTIMENT_POSITIVE, SENTIMENT_NEGATIVE, SENTIMENT_NEUTRAL } from '../../utils/i18nHelpers'
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
   PieChart, Pie, Cell, BarChart, Bar, Legend 
 } from 'recharts'
 
 const SentimentAnalytics = () => {
+  const { t, lang, isRTL, ts, topicLabel, chartLocale } = useLanguage()
   const [allData, setAllData] = useState([]) // Both posts and comments
   const [profiles, setProfiles] = useState([])
   const [topics, setTopics] = useState(['الكل'])
@@ -39,7 +42,7 @@ const SentimentAnalytics = () => {
         const mappedData = fbAllData.map(p => {
           const rawDate = p.posted_at ? new Date(p.posted_at) : new Date()
           const dateStr = rawDate.toISOString().split('T')[0]
-          const labelDate = rawDate.toLocaleString('ar-EG', { month: 'short', day: 'numeric' })
+          const labelDate = rawDate.toLocaleString(chartLocale, { month: 'short', day: 'numeric' })
           return {
             id: p.id,
             profile_id: p.profile,
@@ -63,7 +66,7 @@ const SentimentAnalytics = () => {
         setTopics(['الكل', ...topicsRes.data])
       } catch (err) {
         console.error('Error fetching analytics data:', err)
-        setError('تعذر تحميل بيانات التحليلات.')
+        setError(t('sentLoadError'))
       } finally {
         setLoading(false)
       }
@@ -71,7 +74,7 @@ const SentimentAnalytics = () => {
     fetchData()
   }, [])
 
-  if (loading) return <div style={{ padding: '80px', textAlign: 'center', fontSize: '1.1rem', color: 'var(--text-secondary)' }}>جاري معالجة وتحليل توجهات المشاعر... 🧠</div>
+  if (loading) return <div style={{ padding: '80px', textAlign: 'center', fontSize: '1.1rem', color: 'var(--text-secondary)', fontFamily: isRTL ? 'var(--font-ar)' : 'var(--font-en)' }}>{t('sentLoading')} 🧠</div>
   if (error) return <div style={{ padding: '40px', background: 'var(--red-light)', color: 'var(--red)', borderRadius: '12px', margin: '20px 0' }}>{error}</div>
 
   // Reactive filtering logic
@@ -116,9 +119,9 @@ const SentimentAnalytics = () => {
 
   // Recharts Data mapping
   const pieData = [
-    { name: 'إيجابي', value: positive, color: '#10b981' },
-    { name: 'سلبي', value: negative, color: '#ef4444' },
-    { name: 'محايد', value: neutral, color: '#f59e0b' }
+    { name: ts(SENTIMENT_POSITIVE), value: positive, color: '#10b981' },
+    { name: ts(SENTIMENT_NEGATIVE), value: negative, color: '#ef4444' },
+    { name: ts(SENTIMENT_NEUTRAL), value: neutral, color: '#f59e0b' }
   ].filter(item => item.value > 0)
 
   // Timeline Grouper
@@ -155,7 +158,7 @@ const SentimentAnalytics = () => {
   const topicData = groupTopics()
 
   return (
-    <div>
+    <div style={{ fontFamily: isRTL ? 'var(--font-ar)' : 'var(--font-en)', direction: isRTL ? 'rtl' : 'ltr', textAlign: isRTL ? 'right' : 'left' }}>
       <style>{`
         .analytics-card {
           background: var(--bg-card);
@@ -212,7 +215,7 @@ const SentimentAnalytics = () => {
           border-radius: 8px;
           padding: 10px 16px;
           outline: none;
-          font-family: var(--font-ar);
+          font-family: inherit;
           font-size: .88rem;
           width: 100%;
           transition: all 0.2s;
@@ -226,24 +229,24 @@ const SentimentAnalytics = () => {
       {/* Header */}
       <div style={{ marginBottom: '28px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
         <div>
-          <h1 style={{ fontSize: '1.6rem', marginBottom: '6px' }}>لوحة تحليل المشاعر التفاعلية</h1>
-          <p style={{ fontSize: '.92rem' }}>تقرير عاطفي عميق ومحدث بالخلفية لـ {allData.length} منشوراً وتعليقاً مسحوباً.</p>
+          <h1 style={{ fontSize: '1.6rem', marginBottom: '6px' }}>{t('sentTitle')}</h1>
+          <p style={{ fontSize: '.92rem' }}>{t('sentSubtitle', { count: allData.length })}</p>
         </div>
         
         {/* Time Filter Tabs */}
         <div style={{ display: 'flex', gap: '6px', background: 'var(--bg-elevated)', padding: '4px', borderRadius: '10px', border: '1px solid var(--border)' }}>
           {[
-            { key: 'all', label: 'كل المدة' },
-            { key: '30d', label: 'آخر 30 يوم' },
-            { key: '7d', label: 'آخر 7 أيام' }
-          ].map(t => (
+            { key: 'all', label: t('sentTimeAll') },
+            { key: '30d', label: t('sentTime30d') },
+            { key: '7d', label: t('sentTime7d') }
+          ].map(tab => (
             <button 
-              key={t.key} 
-              className={`filter-btn ${timeRange === t.key ? 'active' : ''}`} 
-              onClick={() => setTimeRange(t.key)}
+              key={tab.key} 
+              className={`filter-btn ${timeRange === tab.key ? 'active' : ''}`} 
+              onClick={() => setTimeRange(tab.key)}
               style={{ padding: '6px 14px', fontSize: '.8rem' }}
             >
-              {t.label}
+              {tab.label}
             </button>
           ))}
         </div>
@@ -254,50 +257,50 @@ const SentimentAnalytics = () => {
         
         {/* Profile filter */}
         <div>
-          <label style={{ fontSize: '.75rem', color: 'var(--text-tertiary)', fontWeight: 600, display: 'block', marginBottom: '6px' }}>🏢 الصفحة المربوطة</label>
+          <label style={{ fontSize: '.75rem', color: 'var(--text-tertiary)', fontWeight: 600, display: 'block', marginBottom: '6px' }}>🏢 {t('sentFilterPage')}</label>
           <select 
             value={selectedProfile} 
             onChange={e => setSelectedProfile(e.target.value)} 
             style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text-primary)', fontSize: '.82rem', fontWeight: 600, outline: 'none' }}
           >
-            <option value="all">كل الصفحات</option>
+            <option value="all">{t('sentAllPages')}</option>
             {profiles.map(p => <option key={p.id} value={p.id}>{p.account_name}</option>)}
           </select>
         </div>
 
         {/* Topic filter */}
         <div>
-          <label style={{ fontSize: '.75rem', color: 'var(--text-tertiary)', fontWeight: 600, display: 'block', marginBottom: '6px' }}>📌 الموضوع المكتشف</label>
+          <label style={{ fontSize: '.75rem', color: 'var(--text-tertiary)', fontWeight: 600, display: 'block', marginBottom: '6px' }}>📌 {t('sentFilterTopic')}</label>
           <select 
             value={selectedTopic} 
             onChange={e => setSelectedTopic(e.target.value)} 
             style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text-primary)', fontSize: '.82rem', fontWeight: 600, outline: 'none' }}
           >
-            {topics.map(t => <option key={t} value={t}>{t === 'الكل' ? 'كل المواضيع' : t}</option>)}
+            {topics.map(topic => <option key={topic} value={topic}>{topic === 'الكل' ? t('topicAll') : topicLabel(topic)}</option>)}
           </select>
         </div>
 
         {/* Media type filter */}
         <div>
-          <label style={{ fontSize: '.75rem', color: 'var(--text-tertiary)', fontWeight: 600, display: 'block', marginBottom: '6px' }}>📂 تصنيف النص</label>
+          <label style={{ fontSize: '.75rem', color: 'var(--text-tertiary)', fontWeight: 600, display: 'block', marginBottom: '6px' }}>📂 {t('sentFilterType')}</label>
           <select 
             value={selectedType} 
             onChange={e => setSelectedType(e.target.value)} 
             style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text-primary)', fontSize: '.82rem', fontWeight: 600, outline: 'none' }}
           >
-            <option value="all">المنشورات والتعليقات</option>
-            <option value="post">المنشورات فقط 📄</option>
-            <option value="comment">التعليقات فقط 💬</option>
+            <option value="all">{t('sentTypeAll')}</option>
+            <option value="post">{t('sentTypePost')} 📄</option>
+            <option value="comment">{t('sentTypeComment')} 💬</option>
           </select>
         </div>
 
         {/* Search query input */}
         <div>
-          <label style={{ fontSize: '.75rem', color: 'var(--text-tertiary)', fontWeight: 600, display: 'block', marginBottom: '6px' }}>🔍 بحث بالكلمة المفتاحية</label>
+          <label style={{ fontSize: '.75rem', color: 'var(--text-tertiary)', fontWeight: 600, display: 'block', marginBottom: '6px' }}>🔍 {t('sentSearchLabel')}</label>
           <input 
             type="text" 
             className="search-input" 
-            placeholder="مثال: رائع، بطيء، التوصيل..." 
+            placeholder={t('sentSearchPlaceholder')} 
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
           />
@@ -310,7 +313,7 @@ const SentimentAnalytics = () => {
         {/* Texts Analyzed */}
         <div className="analytics-card">
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
-            <span style={{ fontSize: '.82rem', color: 'var(--text-secondary)', fontWeight: 600 }}>إجمالي النصوص</span>
+            <span style={{ fontSize: '.82rem', color: 'var(--text-secondary)', fontWeight: 600 }}>{t('sentTotalTexts')}</span>
             <span style={{ fontSize: '1.3rem' }}>📝</span>
           </div>
           <div className="mono" style={{ fontSize: '1.8rem', fontWeight: 800, marginBottom: '6px' }}>{total.toLocaleString()}</div>

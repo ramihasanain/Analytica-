@@ -99,7 +99,7 @@ const ConnectedAccounts = () => {
       }
     } catch (err) {
       console.error('Error initiating OAuth', err)
-      alert('فشل في بدء عملية الربط')
+      alert(t('caConnectFailed'))
     }
   }
 

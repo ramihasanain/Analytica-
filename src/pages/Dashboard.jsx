@@ -106,16 +106,6 @@ const Dashboard = () => {
                             </div>
                             <span style={{ background: '#D1FAE5', color: '#065F46', padding: '6px 12px', borderRadius: '8px', fontSize: '0.85rem', fontWeight: 700 }}>متصل وبسحب تمام</span>
                         </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', border: '1px solid var(--border)', borderRadius: '16px', transition: '0.2s', cursor: 'pointer' }} onMouseOver={(e)=>e.currentTarget.style.borderColor='var(--text-dark)'} onMouseOut={(e)=>e.currentTarget.style.borderColor='var(--border)'}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                                <div style={{ background: '#F3F4F6', width: '48px', height: '48px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem' }}>🐦</div>
-                                <div>
-                                    <div style={{ fontWeight: 700 }}>حساب تويتر الدعم الفني</div>
-                                    <div style={{ fontSize: '0.85rem', color: 'var(--text-light)', marginTop: '4px' }}>سحبنا 400 تغريدة اليوم</div>
-                                </div>
-                            </div>
-                            <span style={{ background: '#D1FAE5', color: '#065F46', padding: '6px 12px', borderRadius: '8px', fontSize: '0.85rem', fontWeight: 700 }}>متصل وبسحب تمام</span>
-                        </div>
                     </div>
                 </div>
 

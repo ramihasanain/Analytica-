@@ -15,7 +15,7 @@ const Posts = () => {
   const [topics, setTopics] = useState(['الكل'])
   const [expandedPost, setExpandedPost] = useState(null)
   const [expandedPostData, setExpandedPostData] = useState({})
-  const { lang, isRTL } = useLanguage()
+  const { t, lang, isRTL, ts, topicLabel, formatDate } = useLanguage()
   const [isClassifyingTopics, setIsClassifyingTopics] = useState(false)
   const [aiTopicsMessage, setAiTopicsMessage] = useState('')
   
@@ -29,7 +29,7 @@ const Posts = () => {
       setTimeout(() => setAiTopicsMessage(''), 8000)
     } catch (err) {
       console.error(err)
-      const errorMsg = err.response?.data?.error || (lang === 'ar' ? 'فشل تصنيف المواضيع بالذكاء الاصطناعي' : 'Failed to classify topics with AI')
+      const errorMsg = err.response?.data?.error || t('postsAiTopicsFail')
       alert(errorMsg)
     } finally {
       setIsClassifyingTopics(false)
@@ -86,7 +86,7 @@ const Posts = () => {
           parent_post_id: p.parent_post, // Preserving parent ID for comments
           platform: p.platform || 'facebook',
           content: p.content,
-          date: p.posted_at ? new Date(p.posted_at).toLocaleString('ar-EG') : 'غير محدد',
+          date: p.posted_at ? formatDate(p.posted_at) : t('dateUnknown'),
           sentiment: p.sentiment || 'محايد',
           score: p.score || 0.5,
           lang: p.detected_lang || 'ar',
@@ -112,7 +112,7 @@ const Posts = () => {
       setPosts(postsMapped)
     } catch (err) {
       console.error('Error fetching data:', err)
-      setError('تعذر جلب البيانات. تأكد من تسجيل الدخول.')
+      setError(t('postsLoadError'))
     } finally {
       if (showLoading) setLoading(false)
     }
@@ -158,20 +158,20 @@ const Posts = () => {
     const neu = postComments.filter(c => c.sentiment === 'محايد').length
     
     let dominant = 'محايد'
-    let dominantText = lang === 'ar' ? 'محايد غالب' : 'Mostly Neutral'
+    let dominantText = t('postsMostlyNeutral')
     let dominantEmoji = '😐'
     let dominantColor = 'var(--amber)'
     let dominantBg = 'var(--amber-light)'
     
     if (pos > neg && pos >= neu) {
       dominant = 'إيجابي'
-      dominantText = lang === 'ar' ? 'إيجابي غالب' : 'Mostly Positive'
+      dominantText = t('postsMostlyPositive')
       dominantEmoji = '😊'
       dominantColor = 'var(--green)'
       dominantBg = 'var(--green-light)'
     } else if (neg > pos && neg >= neu) {
       dominant = 'سلبي'
-      dominantText = lang === 'ar' ? 'سلبي غالب' : 'Mostly Negative'
+      dominantText = t('postsMostlyNegative')
       dominantEmoji = '😠'
       dominantColor = 'var(--red)'
       dominantBg = 'var(--red-light)'
@@ -208,15 +208,11 @@ const Posts = () => {
   return (
     <div style={{ fontFamily: isRTL ? 'var(--font-ar)' : 'var(--font-en)', direction: isRTL ? 'rtl' : 'ltr', textAlign: isRTL ? 'right' : 'left' }}>
       <div style={{ marginBottom: '32px' }}>
-        <h1 style={{ fontSize: '1.6rem', marginBottom: '6px' }}>{lang === 'ar' ? 'المنشورات والتعليقات' : 'Posts & Comments'}</h1>
-        <p style={{ fontSize: '.92rem', color: 'var(--text-secondary)' }}>
-          {lang === 'ar' 
-            ? 'تصفّح جميع البيانات المسحوبة من منصاتك. الفلتر السلبي والإيجابي يصفّق المنشورات حسب مشاعر تعليقاتها.' 
-            : 'Browse all synced posts. Sentiment filters display posts containing comments matching the selected tone.'}
-        </p>
+        <h1 style={{ fontSize: '1.6rem', marginBottom: '6px' }}>{t('postsTitle')}</h1>
+        <p style={{ fontSize: '.92rem', color: 'var(--text-secondary)' }}>{t('postsSubtitle')}</p>
       </div>
 
-      {loading && <div style={{ padding: '40px', textAlign: 'center' }}>{lang === 'ar' ? 'جاري تحميل البيانات...' : 'Loading data...'}</div>}
+      {loading && <div style={{ padding: '40px', textAlign: 'center' }}>{t('dbLoading')}</div>}
       {error && <div style={{ padding: '20px', background: 'var(--red-light)', color: 'var(--red)', borderRadius: '8px' }}>{error}</div>}
 
       {!loading && !error && (
@@ -261,8 +257,8 @@ const Posts = () => {
                 }}></span>
                 <h3 style={{ fontSize: '1.05rem', margin: 0, fontWeight: 700, letterSpacing: '0.02em', color: 'var(--text-primary)' }}>
                   {analysisStats.percentage < 100 
-                    ? (lang === 'ar' ? '🧠 جاري تحليل وتصنيف تعليقات البيانات تلقائياً...' : '🧠 Automatically analyzing and classifying comment sentiments...') 
-                    : (lang === 'ar' ? '✨ تم تصنيف وتحليل كافة تعليقات البيانات بنجاح' : '✨ All comment sentiments analyzed successfully')}
+                    ? `🧠 ${t('postsAnalyzingBg')}` 
+                    : `✨ ${t('postsAnalyzedDone')}`}
                 </h3>
               </div>
               <span className="mono" style={{ fontSize: '1.1rem', fontWeight: 800, color: analysisStats.percentage < 100 ? 'var(--blue)' : 'var(--green)' }}>
@@ -292,13 +288,13 @@ const Posts = () => {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '.8rem', color: 'var(--text-secondary)', flexDirection: isRTL ? 'row' : 'row-reverse' }}>
               <span>
                 {analysisStats.percentage < 100 
-                  ? (lang === 'ar' ? `جاري معالجة التعليقات بالخلفية... (تم تحليل ${analysisStats.analyzed} من أصل ${analysisStats.total})` : `Processing comments in background... (Analyzed ${analysisStats.analyzed} of ${analysisStats.total})`) 
-                  : (lang === 'ar' ? `التحليل مكتمل بالكامل! تم تصنيف جميع البيانات البالغ عددها (${analysisStats.total}) منشوراً وتعليقاً.` : `Analysis fully complete! Categorized all ${analysisStats.total} comments and posts.`)}
+                  ? t('postsProgressBg', { analyzed: analysisStats.analyzed, total: analysisStats.total })
+                  : t('postsProgressDone', { total: analysisStats.total })}
               </span>
               <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>
                 {analysisStats.percentage < 100 
-                  ? (lang === 'ar' ? 'المحرك النشط: MARBERT (محلي) 💻' : 'Active Engine: MARBERT (Local) 💻') 
-                  : (lang === 'ar' ? 'محرك التصنيف: الهجين الذكي 🌐' : 'Classification Engine: Intelligent Hybrid 🌐')}
+                  ? t('postsEngineMarbert')
+                  : t('postsEngineHybrid')}
               </span>
             </div>
           </div>
@@ -308,10 +304,10 @@ const Posts = () => {
             {/* Sentiment Filter */}
             <div style={{ display: 'flex', gap: '4px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', padding: '3px', flexDirection: isRTL ? 'row' : 'row-reverse' }}>
               {[
-                { key: 'all', label: lang === 'ar' ? 'الكل' : 'All' },
-                { key: 'pos', label: lang === 'ar' ? '😊 إيجابي' : '😊 Positive' },
-                { key: 'neg', label: lang === 'ar' ? '😠 سلبي' : '😠 Negative' },
-                { key: 'neu', label: lang === 'ar' ? '😐 محايد' : '😐 Neutral' },
+                { key: 'all', label: t('postsFilterAll') },
+                { key: 'pos', label: `😊 ${t('postsFilterPos')}` },
+                { key: 'neg', label: `😠 ${t('postsFilterNeg')}` },
+                { key: 'neu', label: `😐 ${t('postsFilterNeu')}` },
               ].map(f => (
                 <button key={f.key} onClick={() => setFilter(f.key)} className="btn" style={{ padding: '6px 14px', fontSize: '.83rem', fontWeight: 600, borderRadius: '6px', background: filter === f.key ? 'var(--text-primary)' : 'transparent', color: filter === f.key ? '#fff' : 'var(--text-secondary)', border: 'none' }}>
                   {f.label}
@@ -325,7 +321,7 @@ const Posts = () => {
               onChange={(e) => setTopicFilter(e.target.value)}
               style={{ padding: '9px 16px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', background: 'var(--bg-card)', color: 'var(--text-primary)', fontFamily: isRTL ? 'var(--font-ar)' : 'var(--font-en)', fontWeight: 600, fontSize: '.85rem', cursor: 'pointer', outline: 'none' }}
             >
-              {topics.map(t => <option key={t} value={t}>{t === 'الكل' ? (lang === 'ar' ? '📌 كل المواضيع' : '📌 All Topics') : `📌 ${t}`}</option>)}
+              {topics.map(topic => <option key={topic} value={topic}>{topic === 'الكل' ? `📌 ${t('postsAllTopics')}` : `📌 ${topicLabel(topic)}`}</option>)}
             </select>
 
             {/* Profile Filter */}
@@ -334,7 +330,7 @@ const Posts = () => {
               onChange={(e) => setProfileFilter(e.target.value)}
               style={{ padding: '9px 16px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', background: 'var(--bg-card)', color: 'var(--text-primary)', fontFamily: isRTL ? 'var(--font-ar)' : 'var(--font-en)', fontWeight: 600, fontSize: '.85rem', cursor: 'pointer', outline: 'none' }}
             >
-              <option value="all">{lang === 'ar' ? '🏢 جميع الصفحات المربوطة' : '🏢 All Connected Pages'}</option>
+              <option value="all">🏢 {t('postsAllPages')}</option>
               {profiles.map(prof => (
                 <option key={prof.id} value={prof.id}>
                   {prof.account_name || 'Facebook Page'}
@@ -366,18 +362,18 @@ const Posts = () => {
               {isClassifyingTopics ? (
                 <>
                   <span className="spinner" style={{ width: '14px', height: '14px', border: '2px solid #fff', borderTopColor: 'transparent', borderRadius: '50%', display: 'inline-block', animation: 'spin 1s linear infinite' }}></span>
-                  <span>{lang === 'ar' ? 'جاري التصنيف بالـ AI...' : 'Classifying with AI...'}</span>
+                  <span>{t('postsClassifyingAi')}</span>
                 </>
               ) : (
                 <>
                   <span>🧠</span>
-                  <span>{lang === 'ar' ? 'تصنيف المواضيع بالـ AI' : 'Classify Topics with AI'}</span>
+                  <span>{t('postsClassifyTopicsAi')}</span>
                 </>
               )}
             </button>
 
             <span className="badge badge-gray" style={{ marginInlineStart: isRTL ? 'auto' : '0', marginInlineEnd: !isRTL ? 'auto' : '0' }}>
-              {filtered.length} {lang === 'ar' ? 'نتيجة' : 'results'}
+              {filtered.length} {t('postsResults')}
             </span>
           </div>
 
@@ -413,7 +409,7 @@ const Posts = () => {
                       <div style={{ width: '28px', height: '28px', borderRadius: '6px', background: 'rgba(24, 119, 242, 0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         <svg width="14" height="14" fill="#1877F2" viewBox="0 0 24 24"><path d="M9 8h-3v4h3v12h5v-12h3.642l.358-4h-4v-1.667c0-.955.192-1.333 1.115-1.333h2.885v-5h-3.808c-3.596 0-5.192 1.583-5.192 4.615v3.385z"/></svg>
                       </div>
-                      <span className="badge badge-gray" style={{ fontSize: '.78rem' }}>{lang === 'ar' ? 'منشور' : 'Post'}</span>
+                      <span className="badge badge-gray" style={{ fontSize: '.78rem' }}>{t('postsPostBadge')}</span>
                       <span className="badge badge-blue" style={{ fontSize: '.75rem' }}>📌 {post.topic}</span>
                       <span style={{ fontSize: '.8rem', color: 'var(--text-tertiary)' }}>{post.date}</span>
                       <span className="badge badge-gray" style={{ fontSize: '.72rem' }}>{post.lang.toUpperCase()}</span>
@@ -431,18 +427,18 @@ const Posts = () => {
                         🔄 {post.shares}
                       </span>
                       <span style={{ fontSize: '.82rem', color: 'var(--text-tertiary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        💬 {post.comments || 0} {lang === 'ar' ? 'تعليق' : 'comments'}
+                        💬 {post.comments || 0} {t('postsComments')}
                       </span>
                       
                       <a href={post.url} target="_blank" rel="noopener noreferrer" style={{ fontSize: '.82rem', color: 'var(--blue)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px', marginInlineStart: isRTL ? 'auto' : '0', marginInlineEnd: !isRTL ? 'auto' : '0' }}>
                         <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"/></svg>
-                        {lang === 'ar' ? 'عرض المنشور الأصلي' : 'View Original Post'}
+                        {t('postsViewOriginal')}
                       </a>
 
                       <button onClick={() => handleExpand(post.id)} className="btn btn-ghost" style={{ fontSize: '.82rem', padding: '4px 12px', fontWeight: 700, color: 'var(--blue)' }}>
                         {expandedPost === post.id 
-                          ? (lang === 'ar' ? '▲ إخفاء التفاصيل' : '▲ Hide Details') 
-                          : (lang === 'ar' ? `▼ عرض التفاعلات والتعليقات` : `▼ View Reactions & Comments`)}
+                          ? `▲ ${t('postsHideDetails')}` 
+                          : `▼ ${t('postsShowDetails')}`}
                       </button>
                     </div>
                   </div>
@@ -456,7 +452,7 @@ const Posts = () => {
                           <div style={{ minWidth: '140px', textAlign: 'center', padding: '12px', background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                             <div style={{ fontSize: '1.4rem', marginBottom: '4px' }}>💬</div>
                             <div style={{ fontWeight: 700, fontSize: '.8rem', color: 'var(--text-tertiary)' }}>
-                              {lang === 'ar' ? 'لا يوجد تعليقات' : 'No Comments'}
+                              {t('postsNoComments')}
                             </div>
                           </div>
                         )
@@ -502,7 +498,7 @@ const Posts = () => {
                         animation: 'spin 1s linear infinite' 
                       }}></span>
                       <div style={{ fontWeight: 700, fontSize: '.75rem', color: 'var(--blue)' }}>
-                        {lang === 'ar' ? 'جاري التحليل...' : 'Analyzing...'}
+                        {t('postsAnalyzing')}
                       </div>
                     </div>
                   )}
@@ -522,21 +518,21 @@ const Posts = () => {
                         marginBottom: '16px',
                         fontSize: '.9rem',
                         color: '#7c3aed',
-                        direction: 'rtl',
-                        textAlign: 'right'
+                        direction: isRTL ? 'rtl' : 'ltr',
+                        textAlign: isRTL ? 'right' : 'left'
                       }}>
-                        ⚠️ <strong>رصد سخرية مبطنة:</strong> {post.sarcasm_explanation || 'تم رصد نبرة تهكمية/سخرية مبطنة في السياق.'}
+                        ⚠️ <strong>{t('sarcasmDetectedInline')}:</strong> {post.sarcasm_explanation || t('sarcasmDefaultExplain')}
                       </div>
                     )}
 
                     {!expandedPostData[post.id] ? (
-                      <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-secondary)' }}>{lang === 'ar' ? 'جاري تحميل التفاصيل...' : 'Loading details...'}</div>
+                      <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-secondary)' }}>{t('postsLoadingDetails')}</div>
                     ) : (
                       <>
                         {/* Reactions */}
                         <div style={{ marginBottom: '24px', textAlign: isRTL ? 'right' : 'left' }}>
                           <div style={{ fontSize: '.85rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '12px' }}>
-                            👍 {lang === 'ar' ? `تفاعلات المنشور (${expandedPostData[post.id].reactions.length})` : `Post Reactions (${expandedPostData[post.id].reactions.length})`}
+                            👍 {t('postsReactions')} ({expandedPostData[post.id].reactions.length})
                           </div>
                           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', flexDirection: isRTL ? 'row' : 'row-reverse' }}>
                             {expandedPostData[post.id].reactions.map(r => (
@@ -545,14 +541,14 @@ const Posts = () => {
                                 <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{r.author_name}</span>
                               </div>
                             ))}
-                            {expandedPostData[post.id].reactions.length === 0 && <span style={{ fontSize: '.8rem', color: 'var(--text-tertiary)' }}>{lang === 'ar' ? 'لا يوجد تفاعلات مسحوبة' : 'No reactions fetched'}</span>}
+                            {expandedPostData[post.id].reactions.length === 0 && <span style={{ fontSize: '.8rem', color: 'var(--text-tertiary)' }}>{t('postsNoReactions')}</span>}
                           </div>
                         </div>
 
                         {/* Comments */}
                         <div style={{ textAlign: isRTL ? 'right' : 'left' }}>
                           <div style={{ fontSize: '.85rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '14px' }}>
-                            💬 {lang === 'ar' ? `جدول التعليقات (${getFilteredComments(expandedPostData[post.id].comments).length})` : `Comments Grid (${getFilteredComments(expandedPostData[post.id].comments).length})`}
+                            💬 {t('postsCommentsTable')} ({getFilteredComments(expandedPostData[post.id].comments).length})
                           </div>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                             {getFilteredComments(expandedPostData[post.id].comments).map(comment => (
@@ -569,14 +565,14 @@ const Posts = () => {
                                   {/* Sarcasm flag on comments */}
                                   {comment.is_sarcastic && (
                                     <div style={{ fontSize: '.8rem', color: '#7c3aed', background: 'rgba(124, 58, 237, 0.05)', padding: '6px 12px', borderRadius: '4px', borderRight: isRTL ? '3px solid #7c3aed' : 'none', borderLeft: !isRTL ? '3px solid #7c3aed' : 'none', display: 'inline-block' }}>
-                                      ⚠️ <strong>{lang === 'ar' ? 'رصد سخرية:' : 'Sarcasm Detected:'}</strong> {comment.sarcasm_explanation || 'Sarcasm flagged in context.'}
+                                      ⚠️ <strong>{t('sarcasmDetected')}:</strong> {comment.sarcasm_explanation || t('sarcasmDefaultExplain')}
                                     </div>
                                   )}
                                 </div>
                                 {comment.is_analyzed ? (
                                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: isRTL ? 'flex-start' : 'flex-end', gap: '6px' }}>
-                                    <span className={`badge ${comment.sentiment === 'إيجابي' ? 'badge-green' : comment.sentiment === 'سلبي' ? 'badge-red' : 'badge-amber'}`} style={{ flexShrink: 0, fontSize: '.78rem' }}>
-                                      {comment.sentiment} 
+                                    <span className={`badge ${comment.sentiment === 'إيجابي' ? 'badge-green' : comment.sentiment === 'سلبي' ? 'badge-red' : 'badge-amber'}`} style={{ flexShrink: 0, fontSize: '.78rem' }} title={comment.sentiment}>
+                                      {ts(comment.sentiment)} 
                                       {comment.engine_used && !(comment.engine_used.toLowerCase().includes('gemini') || comment.engine_used.toLowerCase().includes('ai')) && (
                                         ` ${(comment.score * 100).toFixed(0)}%`
                                       )}
@@ -597,7 +593,7 @@ const Posts = () => {
                                 )}
                               </div>
                             ))}
-                            {getFilteredComments(expandedPostData[post.id].comments).length === 0 && <span style={{ fontSize: '.8rem', color: 'var(--text-tertiary)', textAlign: 'center', padding: '12px' }}>{lang === 'ar' ? 'لا يوجد تعليقات مطابقة' : 'No matching comments'}</span>}
+                            {getFilteredComments(expandedPostData[post.id].comments).length === 0 && <span style={{ fontSize: '.8rem', color: 'var(--text-tertiary)', textAlign: 'center', padding: '12px' }}>{t('postsNoMatchingComments')}</span>}
                           </div>
                         </div>
                       </>
@@ -607,7 +603,7 @@ const Posts = () => {
               </div>
             ))}
           </div>
-          {filtered.length === 0 && <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>{lang === 'ar' ? 'لا توجد منشورات مطابقة.' : 'No matching posts.'}</div>}
+          {filtered.length === 0 && <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>{t('postsNoMatching')}</div>}
         </>
       )}
     </div>
