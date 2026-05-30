@@ -15,8 +15,6 @@ api.interceptors.request.use((config) => {
   const isAuthRequest = [
     '/token-auth/',
     '/auth/login/',
-    '/auth/google/url/',
-    '/auth/google/callback/',
     '/auth/totp/confirm-setup/',
     '/auth/totp/verify/',
   ].some((path) => config.url === path || config.url?.endsWith(path))
