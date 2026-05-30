@@ -1,26 +1,91 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import api from '../../services/api'
 import { useLanguage } from '../../LanguageContext'
-import { SENTIMENT_POSITIVE, SENTIMENT_NEGATIVE, SENTIMENT_NEUTRAL } from '../../utils/i18nHelpers'
-import { 
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
-  PieChart, Pie, Cell, BarChart, Bar, Legend 
+import { SENTIMENT_POSITIVE, SENTIMENT_NEGATIVE, SENTIMENT_NEUTRAL, isGeminiEngine } from '../../utils/i18nHelpers'
+import {
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  PieChart, Pie, Cell, BarChart, Bar, Legend, LabelList
 } from 'recharts'
+
+const COLORS = {
+  pos: '#10b981',
+  posLight: '#34d399',
+  neg: '#ef4444',
+  negLight: '#f87171',
+  neu: '#f59e0b',
+  neuLight: '#fbbf24',
+  blue: '#2563eb',
+  indigo: '#6366f1',
+  violet: '#8b5cf6',
+}
+
+const truncateLabel = (text, max = 40) => {
+  if (!text) return ''
+  const cleaned = text.replace(/\s+/g, ' ').trim()
+  return cleaned.length > max ? `${cleaned.slice(0, max)}…` : cleaned
+}
+
+const ChartTooltip = ({ active, payload, label, ts }) => {
+  if (!active || !payload?.length) return null
+  return (
+    <div className="sent-tooltip">
+      {label && <div className="sent-tooltip-label">{label}</div>}
+      <div className="sent-tooltip-rows">
+        {payload.map((entry, i) => (
+          <div key={i} className="sent-tooltip-row">
+            <span className="sent-tooltip-dot" style={{ background: entry.color || entry.fill }} />
+            <span className="sent-tooltip-name">{ts(entry.name) || entry.name}</span>
+            <span className="sent-tooltip-val mono">{entry.value}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+const KpiCard = ({ variant, icon, label, value, sub, progress, delay = 0 }) => (
+  <div className={`sent-kpi sent-kpi--${variant} animate-fade-up`} style={{ animationDelay: `${delay}s` }}>
+    <div className="sent-kpi-glow" aria-hidden />
+    <div className="sent-kpi-top">
+      <span className="sent-kpi-label">{label}</span>
+      <span className="sent-kpi-icon">{icon}</span>
+    </div>
+    <div className="sent-kpi-value">{value}</div>
+    {progress != null && (
+      <div className="sent-kpi-bar">
+        <div className="sent-kpi-bar-fill" style={{ width: `${Math.min(100, progress)}%` }} />
+      </div>
+    )}
+    {sub && <div className="sent-kpi-sub">{sub}</div>}
+  </div>
+)
+
+const ChartPanel = ({ title, subtitle, children, className = '', action }) => (
+  <div className={`sent-chart-panel animate-fade-up ${className}`}>
+    <div className="sent-chart-head">
+      <div>
+        <h3 className="sent-chart-title">{title}</h3>
+        {subtitle && <p className="sent-chart-sub">{subtitle}</p>}
+      </div>
+      {action}
+    </div>
+    <div className="sent-chart-body">{children}</div>
+  </div>
+)
 
 const SentimentAnalytics = () => {
   const { t, lang, isRTL, ts, topicLabel, chartLocale } = useLanguage()
-  const [allData, setAllData] = useState([]) // Both posts and comments
+  const [allData, setAllData] = useState([])
   const [profiles, setProfiles] = useState([])
   const [topics, setTopics] = useState(['الكل'])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
-  // Interactive filtering states
   const [selectedProfile, setSelectedProfile] = useState('all')
   const [selectedTopic, setSelectedTopic] = useState('الكل')
-  const [selectedType, setSelectedType] = useState('all') // 'all', 'post', 'comment'
-  const [selectedSentiment, setSelectedSentiment] = useState('all') // 'all', 'إيجابي', 'سلبي', 'محايد'
-  const [timeRange, setTimeRange] = useState('all') // 'all', '7d', '30d'
+  const [selectedType, setSelectedType] = useState('all')
+  const [selectedSentiment, setSelectedSentiment] = useState('all')
+  const [timeRange, setTimeRange] = useState('all')
   const [searchQuery, setSearchQuery] = useState('')
 
   useEffect(() => {
@@ -31,37 +96,26 @@ const SentimentAnalytics = () => {
           api.get('/profiles/'),
           api.get('/posts/topics/')
         ])
-
-        // Only keep Facebook data
         const fbProfiles = profilesRes.data.filter(prof => prof.platform === 'facebook')
         setProfiles(fbProfiles)
-
         const fbAllData = postsRes.data.filter(p => p.platform === 'facebook')
-        
-        // Map raw data and parse dates for time range calculations
         const mappedData = fbAllData.map(p => {
           const rawDate = p.posted_at ? new Date(p.posted_at) : new Date()
-          const dateStr = rawDate.toISOString().split('T')[0]
-          const labelDate = rawDate.toLocaleString(chartLocale, { month: 'short', day: 'numeric' })
           return {
             id: p.id,
             profile_id: p.profile,
             platform: p.platform || 'facebook',
             content: p.content,
             raw_date: rawDate,
-            dateStr: dateStr,
-            labelDate: labelDate,
-            sentiment: p.sentiment || 'محايد',
+            sentiment: p.sentiment || SENTIMENT_NEUTRAL,
             score: p.score || 0.5,
             type: p.media_type || 'post',
+            parent_post: p.parent_post ?? null,
             topic: p.topic || 'غير محدد',
             engine_used: p.engine_used || 'Local Lexicon',
-            is_sarcastic: p.is_sarcastic || false,
-            sarcasm_explanation: p.sarcasm_explanation || '',
             is_analyzed: p.is_analyzed || false
           }
         })
-
         setAllData(mappedData)
         setTopics(['الكل', ...topicsRes.data])
       } catch (err) {
@@ -72,482 +126,709 @@ const SentimentAnalytics = () => {
       }
     }
     fetchData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  if (loading) return <div style={{ padding: '80px', textAlign: 'center', fontSize: '1.1rem', color: 'var(--text-secondary)', fontFamily: isRTL ? 'var(--font-ar)' : 'var(--font-en)' }}>{t('sentLoading')} 🧠</div>
-  if (error) return <div style={{ padding: '40px', background: 'var(--red-light)', color: 'var(--red)', borderRadius: '12px', margin: '20px 0' }}>{error}</div>
+  const formatChartDay = (rawDate) =>
+    rawDate.toLocaleString(chartLocale, { month: 'short', day: 'numeric' })
 
-  // Reactive filtering logic
-  const filteredData = allData.filter(item => {
+  const filteredData = useMemo(() => allData.filter(item => {
     if (selectedProfile !== 'all' && item.profile_id !== parseInt(selectedProfile)) return false
     if (selectedTopic !== 'الكل' && item.topic !== selectedTopic) return false
     if (selectedType !== 'all' && item.type !== selectedType) return false
     if (selectedSentiment !== 'all' && item.sentiment !== selectedSentiment) return false
     if (searchQuery.trim() && !item.content.toLowerCase().includes(searchQuery.toLowerCase())) return false
-
     if (timeRange !== 'all') {
       const now = new Date()
-      const diffTime = Math.abs(now - item.raw_date)
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+      const diffDays = Math.ceil(Math.abs(now - item.raw_date) / (1000 * 60 * 60 * 24))
       if (timeRange === '7d' && diffDays > 7) return false
       if (timeRange === '30d' && diffDays > 30) return false
     }
     return true
-  })
+  }), [allData, selectedProfile, selectedTopic, selectedType, selectedSentiment, searchQuery, timeRange])
 
-  // Dynamic Metrics Calculations
-  const total = filteredData.length
-  const positive = filteredData.filter(i => i.sentiment === 'إيجابي').length
-  const negative = filteredData.filter(i => i.sentiment === 'سلبي').length
-  const neutral = filteredData.filter(i => i.sentiment === 'محايد').length
-  
-  const posPct = total > 0 ? Math.round((positive / total) * 100) : 0
-  const negPct = total > 0 ? Math.round((negative / total) * 100) : 0
-  const neuPct = total > 0 ? Math.round((neutral / total) * 100) : 0
-  
-  const csatScore = total > 0 ? (((positive * 10) + (neutral * 5)) / total).toFixed(1) : '0.0'
-  const sarcasticCount = filteredData.filter(i => i.is_sarcastic).length
-  const sarcasmRate = total > 0 ? ((sarcasticCount / total) * 100).toFixed(1) : '0.0'
+  const filteredComments = useMemo(() => filteredData.filter(i => i.type === 'comment'), [filteredData])
 
-  // Advanced Professional KPIs
-  const npsScore = posPct - negPct
-  const avgConfidence = total > 0 ? Math.round((filteredData.reduce((acc, curr) => acc + curr.score, 0) / total) * 100) : 0
-  
-  const postsCount = filteredData.filter(i => i.type === 'post').length
-  const commentsCount = filteredData.filter(i => i.type === 'comment').length
-  const commentsRatio = postsCount > 0 ? (commentsCount / postsCount).toFixed(1) : '0.0'
+  const metrics = useMemo(() => {
+    const commentTotal = filteredComments.length
+    const commentPositive = filteredComments.filter(i => i.sentiment === SENTIMENT_POSITIVE).length
+    const commentNegative = filteredComments.filter(i => i.sentiment === SENTIMENT_NEGATIVE).length
+    const commentNeutral = filteredComments.filter(i => i.sentiment === SENTIMENT_NEUTRAL).length
+    const posPct = commentTotal > 0 ? Math.round((commentPositive / commentTotal) * 100) : 0
+    const negPct = commentTotal > 0 ? Math.round((commentNegative / commentTotal) * 100) : 0
+    const neuPct = commentTotal > 0 ? Math.round((commentNeutral / commentTotal) * 100) : 0
+    const csatScore = commentTotal > 0
+      ? (((commentPositive * 10) + (commentNeutral * 5)) / commentTotal).toFixed(1)
+      : '0.0'
+    const avgConfidence = commentTotal > 0
+      ? Math.round((filteredComments.reduce((acc, curr) => acc + curr.score, 0) / commentTotal) * 100)
+      : 0
+    const postsCount = filteredData.filter(i => i.type === 'post').length
+    const commentsCount = commentTotal
+    const commentsRatio = postsCount > 0 ? (commentsCount / postsCount).toFixed(1) : '0.0'
+    return {
+      commentTotal, commentPositive, commentNegative, commentNeutral,
+      posPct, negPct, neuPct, csatScore, avgConfidence, postsCount, commentsCount, commentsRatio
+    }
+  }, [filteredComments, filteredData])
 
-  // Recharts Data mapping
-  const pieData = [
-    { name: ts(SENTIMENT_POSITIVE), value: positive, color: '#10b981' },
-    { name: ts(SENTIMENT_NEGATIVE), value: negative, color: '#ef4444' },
-    { name: ts(SENTIMENT_NEUTRAL), value: neutral, color: '#f59e0b' }
-  ].filter(item => item.value > 0)
+  const pieData = useMemo(() => [
+    { name: SENTIMENT_POSITIVE, label: ts(SENTIMENT_POSITIVE), value: metrics.commentPositive, color: COLORS.pos },
+    { name: SENTIMENT_NEGATIVE, label: ts(SENTIMENT_NEGATIVE), value: metrics.commentNegative, color: COLORS.neg },
+    { name: SENTIMENT_NEUTRAL, label: ts(SENTIMENT_NEUTRAL), value: metrics.commentNeutral, color: COLORS.neu }
+  ].filter(item => item.value > 0), [metrics, ts])
 
-  // Timeline Grouper
-  const groupTimeline = () => {
+  const timelineData = useMemo(() => {
     const groups = {}
-    filteredData.forEach(item => {
-      const key = item.labelDate
+    filteredComments.forEach(item => {
+      const key = formatChartDay(item.raw_date)
       if (!groups[key]) {
-        groups[key] = { date: key, raw_date: item.raw_date, 'إيجابي': 0, 'سلبي': 0, 'محايد': 0 }
+        groups[key] = { date: key, raw_date: item.raw_date, [SENTIMENT_POSITIVE]: 0, [SENTIMENT_NEGATIVE]: 0, [SENTIMENT_NEUTRAL]: 0 }
       }
       groups[key][item.sentiment]++
     })
-    return Object.values(groups)
-      .sort((a, b) => a.raw_date - b.raw_date)
-      .slice(-15) // Show last 15 active days for readability
-  }
-  const timelineData = groupTimeline()
+    return Object.values(groups).sort((a, b) => a.raw_date - b.raw_date).slice(-15)
+  }, [filteredComments, chartLocale])
 
-  // Topic Grouper
-  const groupTopics = () => {
+  const postChartData = useMemo(() => {
+    const postById = {}
+    allData.forEach(item => { if (item.type === 'post') postById[item.id] = item })
     const groups = {}
-    filteredData.forEach(item => {
-      const key = item.topic
-      if (!groups[key]) {
-        groups[key] = { topic: key, 'إيجابي': 0, 'سلبي': 0, 'محايد': 0, total: 0 }
+    filteredComments.forEach(item => {
+      const pid = item.parent_post
+      if (!pid) return
+      if (!groups[pid]) {
+        const parent = postById[pid]
+        groups[pid] = {
+          postLabel: parent ? truncateLabel(parent.content) : t('sentPostFallback', { id: pid }),
+          [SENTIMENT_POSITIVE]: 0,
+          [SENTIMENT_NEGATIVE]: 0,
+          [SENTIMENT_NEUTRAL]: 0,
+          total: 0
+        }
       }
-      groups[key][item.sentiment]++
-      groups[key].total++
+      if (groups[pid][item.sentiment] !== undefined) groups[pid][item.sentiment]++
+      groups[pid].total++
     })
-    return Object.values(groups)
-      .sort((a, b) => b.total - a.total)
-      .slice(0, 5) // Top 5 topics
+    return Object.values(groups).sort((a, b) => b.total - a.total).slice(0, 5)
+  }, [filteredComments, allData, t])
+
+  const sentimentPills = [
+    { key: 'all', label: t('filterAll'), color: COLORS.blue },
+    { key: SENTIMENT_POSITIVE, label: ts(SENTIMENT_POSITIVE), color: COLORS.pos },
+    { key: SENTIMENT_NEGATIVE, label: ts(SENTIMENT_NEGATIVE), color: COLORS.neg },
+    { key: SENTIMENT_NEUTRAL, label: ts(SENTIMENT_NEUTRAL), color: COLORS.neu },
+  ]
+
+  const chartMargin = { top: 12, right: isRTL ? 8 : 16, left: isRTL ? 16 : 8, bottom: 4 }
+  const yOrient = isRTL ? 'right' : 'left'
+
+  if (loading) {
+    return (
+      <div className="sent-page" style={{ fontFamily: isRTL ? 'var(--font-ar)' : 'var(--font-en)' }}>
+        <div className="sent-loading">
+          <div className="sent-loading-ring" />
+          <p>{t('sentLoading')}</p>
+        </div>
+      </div>
+    )
   }
-  const topicData = groupTopics()
+
+  if (error) {
+    return (
+      <div className="sent-page" style={{ fontFamily: isRTL ? 'var(--font-ar)' : 'var(--font-en)' }}>
+        <div className="sent-error">{error}</div>
+      </div>
+    )
+  }
 
   return (
-    <div style={{ fontFamily: isRTL ? 'var(--font-ar)' : 'var(--font-en)', direction: isRTL ? 'rtl' : 'ltr', textAlign: isRTL ? 'right' : 'left' }}>
-      <style>{`
-        .analytics-card {
-          background: var(--bg-card);
-          backdrop-filter: blur(16px);
-          border: 1px solid var(--border);
-          border-radius: 16px;
-          padding: 22px;
-          color: var(--text-primary);
-          transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-          box-shadow: 0 4px 20px rgba(0, 0, 0, 0.02);
-        }
-        .analytics-card:hover {
-          transform: translateY(-4px);
-          border-color: rgba(37, 99, 235, 0.2);
-          box-shadow: 0 12px 36px rgba(0, 0, 0, 0.06);
-        }
-        .glow-pos:hover {
-          border-color: rgba(16, 185, 129, 0.3);
-          box-shadow: 0 12px 30px rgba(16, 185, 129, 0.08);
-        }
-        .glow-neg:hover {
-          border-color: rgba(239, 68, 68, 0.3);
-          box-shadow: 0 12px 30px rgba(239, 68, 68, 0.08);
-        }
-        .glow-neu:hover {
-          border-color: rgba(245, 158, 11, 0.3);
-          box-shadow: 0 12px 30px rgba(245, 158, 11, 0.08);
-        }
-        .filter-btn {
-          padding: 8px 16px;
-          font-size: .83rem;
-          font-weight: 600;
-          border-radius: 8px;
-          border: 1px solid var(--border);
-          background: var(--bg-card);
-          color: var(--text-secondary);
-          cursor: pointer;
-          transition: all 0.2s;
-        }
-        .filter-btn:hover {
-          background: var(--bg-elevated);
-          color: var(--text-primary);
-        }
-        .filter-btn.active {
-          background: var(--blue);
-          color: #fff;
-          border-color: var(--blue);
-          box-shadow: 0 0 12px rgba(37, 99, 235, 0.2);
-        }
-        .search-input {
-          background: var(--bg-card);
-          border: 1px solid var(--border);
-          color: var(--text-primary);
-          border-radius: 8px;
-          padding: 10px 16px;
-          outline: none;
-          font-family: inherit;
-          font-size: .88rem;
-          width: 100%;
-          transition: all 0.2s;
-        }
-        .search-input:focus {
-          border-color: var(--blue);
-          box-shadow: 0 0 8px rgba(37, 99, 235, 0.15);
-        }
-      `}</style>
+    <div
+      className="sent-page"
+      style={{ fontFamily: isRTL ? 'var(--font-ar)' : 'var(--font-en)', direction: isRTL ? 'rtl' : 'ltr' }}
+    >
+      {/* Hero */}
+      <header className="sent-hero animate-fade-up">
+        <div className="sent-hero-mesh" aria-hidden />
+        <div className="sent-hero-grid" aria-hidden />
+        <div className="sent-hero-inner">
+          <div className="sent-hero-text">
+            <span className="sent-hero-pill">
+              <span className="sent-hero-pulse" />
+              {t('sentFilteredFacebookBadge')}
+            </span>
+            <h1>{t('sentTitle')}</h1>
+            <p>{t('sentSubtitle', { count: metrics.commentTotal })}</p>
+          </div>
+          <div className="sent-hero-actions">
+            <div className="sent-time-tabs">
+              {[
+                { key: 'all', label: t('sentTimeAll') },
+                { key: '30d', label: t('sentTime30d') },
+                { key: '7d', label: t('sentTime7d') }
+              ].map(tab => (
+                <button
+                  key={tab.key}
+                  type="button"
+                  className={`sent-time-tab ${timeRange === tab.key ? 'active' : ''}`}
+                  onClick={() => setTimeRange(tab.key)}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+            <div className="sent-sentiment-pills">
+              {sentimentPills.map(p => (
+                <button
+                  key={p.key}
+                  type="button"
+                  className={`sent-pill ${selectedSentiment === p.key ? 'active' : ''}`}
+                  style={{ '--pill-color': p.color }}
+                  onClick={() => setSelectedSentiment(p.key)}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </header>
 
-      {/* Header */}
-      <div style={{ marginBottom: '28px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
-        <div>
-          <h1 style={{ fontSize: '1.6rem', marginBottom: '6px' }}>{t('sentTitle')}</h1>
-          <p style={{ fontSize: '.92rem' }}>{t('sentSubtitle', { count: allData.length })}</p>
-        </div>
-        
-        {/* Time Filter Tabs */}
-        <div style={{ display: 'flex', gap: '6px', background: 'var(--bg-elevated)', padding: '4px', borderRadius: '10px', border: '1px solid var(--border)' }}>
-          {[
-            { key: 'all', label: t('sentTimeAll') },
-            { key: '30d', label: t('sentTime30d') },
-            { key: '7d', label: t('sentTime7d') }
-          ].map(tab => (
-            <button 
-              key={tab.key} 
-              className={`filter-btn ${timeRange === tab.key ? 'active' : ''}`} 
-              onClick={() => setTimeRange(tab.key)}
-              style={{ padding: '6px 14px', fontSize: '.8rem' }}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
+      {/* Filters */}
+      <div className="sent-filters animate-fade-up" style={{ animationDelay: '.06s' }}>
+        {[
+          { id: 'profile', label: t('sentFilterPage'), icon: '🏢', el: (
+            <select value={selectedProfile} onChange={e => setSelectedProfile(e.target.value)} className="sent-select">
+              <option value="all">{t('sentAllPages')}</option>
+              {profiles.map(p => <option key={p.id} value={p.id}>{p.account_name}</option>)}
+            </select>
+          )},
+          { id: 'topic', label: t('sentFilterTopic'), icon: '📌', el: (
+            <select value={selectedTopic} onChange={e => setSelectedTopic(e.target.value)} className="sent-select">
+              {topics.map(topic => (
+                <option key={topic} value={topic}>
+                  {topic === 'الكل' ? t('topicAll') : topicLabel(topic)}
+                </option>
+              ))}
+            </select>
+          )},
+          { id: 'type', label: t('sentFilterType'), icon: '📂', el: (
+            <select value={selectedType} onChange={e => setSelectedType(e.target.value)} className="sent-select">
+              <option value="all">{t('sentTypeAll')}</option>
+              <option value="post">{t('sentTypePost')}</option>
+              <option value="comment">{t('sentTypeComment')}</option>
+            </select>
+          )},
+          { id: 'search', label: t('sentSearchLabel'), icon: '🔍', el: (
+            <input
+              type="text"
+              className="sent-search"
+              placeholder={t('sentSearchPlaceholder')}
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+            />
+          )}
+        ].map(f => (
+          <div key={f.id} className="sent-filter-field">
+            <label>{f.icon} {f.label}</label>
+            {f.el}
+          </div>
+        ))}
       </div>
 
-      {/* Interactive Controls Bar */}
-      <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '16px 20px', marginBottom: '24px', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1.5fr', gap: '16px', alignItems: 'center' }}>
-        
-        {/* Profile filter */}
-        <div>
-          <label style={{ fontSize: '.75rem', color: 'var(--text-tertiary)', fontWeight: 600, display: 'block', marginBottom: '6px' }}>🏢 {t('sentFilterPage')}</label>
-          <select 
-            value={selectedProfile} 
-            onChange={e => setSelectedProfile(e.target.value)} 
-            style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text-primary)', fontSize: '.82rem', fontWeight: 600, outline: 'none' }}
-          >
-            <option value="all">{t('sentAllPages')}</option>
-            {profiles.map(p => <option key={p.id} value={p.id}>{p.account_name}</option>)}
-          </select>
-        </div>
-
-        {/* Topic filter */}
-        <div>
-          <label style={{ fontSize: '.75rem', color: 'var(--text-tertiary)', fontWeight: 600, display: 'block', marginBottom: '6px' }}>📌 {t('sentFilterTopic')}</label>
-          <select 
-            value={selectedTopic} 
-            onChange={e => setSelectedTopic(e.target.value)} 
-            style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text-primary)', fontSize: '.82rem', fontWeight: 600, outline: 'none' }}
-          >
-            {topics.map(topic => <option key={topic} value={topic}>{topic === 'الكل' ? t('topicAll') : topicLabel(topic)}</option>)}
-          </select>
-        </div>
-
-        {/* Media type filter */}
-        <div>
-          <label style={{ fontSize: '.75rem', color: 'var(--text-tertiary)', fontWeight: 600, display: 'block', marginBottom: '6px' }}>📂 {t('sentFilterType')}</label>
-          <select 
-            value={selectedType} 
-            onChange={e => setSelectedType(e.target.value)} 
-            style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text-primary)', fontSize: '.82rem', fontWeight: 600, outline: 'none' }}
-          >
-            <option value="all">{t('sentTypeAll')}</option>
-            <option value="post">{t('sentTypePost')} 📄</option>
-            <option value="comment">{t('sentTypeComment')} 💬</option>
-          </select>
-        </div>
-
-        {/* Search query input */}
-        <div>
-          <label style={{ fontSize: '.75rem', color: 'var(--text-tertiary)', fontWeight: 600, display: 'block', marginBottom: '6px' }}>🔍 {t('sentSearchLabel')}</label>
-          <input 
-            type="text" 
-            className="search-input" 
-            placeholder={t('sentSearchPlaceholder')} 
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-          />
-        </div>
+      {/* KPIs */}
+      <div className="sent-kpi-grid">
+        <KpiCard variant="blue" icon="💬" label={t('sentTotalAnalyzedComments')} value={metrics.commentTotal.toLocaleString()} sub={t('sentFilteredFacebookBadge')} delay={0.08} />
+        <KpiCard variant="indigo" icon="⭐" label={t('sentCsatTitle')} value={`${metrics.csatScore}/10`} sub={t('sentCsatBadge')} progress={parseFloat(metrics.csatScore) * 10} delay={0.12} />
+        <KpiCard variant="violet" icon="🎯" label={t('sentConfidenceTitle')} value={`${metrics.avgConfidence}%`} sub={t('sentConfidenceBadge')} progress={metrics.avgConfidence} delay={0.16} />
+        <KpiCard variant="green" icon="😊" label={t('sentPositiveComments')} value={`${metrics.posPct}%`} sub={t('sentCommentsCount', { count: metrics.commentPositive })} progress={metrics.posPct} delay={0.2} />
+        <KpiCard variant="red" icon="😠" label={t('sentNegativeComments')} value={`${metrics.negPct}%`} sub={t('sentCommentsCount', { count: metrics.commentNegative })} progress={metrics.negPct} delay={0.24} />
+        <KpiCard
+          variant="cyan"
+          icon="📊"
+          label={t('sentEngagementTitle')}
+          value={<><span className="mono">{metrics.commentsRatio}</span><span className="sent-kpi-unit"> {t('sentEngagementUnit')}</span></>}
+          sub={t('sentEngagementBase', { posts: metrics.postsCount, comments: metrics.commentsCount })}
+          delay={0.28}
+        />
       </div>
 
-      {/* KPI Cards Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '24px' }}>
-        
-        {/* Texts Analyzed */}
-        <div className="analytics-card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
-            <span style={{ fontSize: '.82rem', color: 'var(--text-secondary)', fontWeight: 600 }}>{t('sentTotalTexts')}</span>
-            <span style={{ fontSize: '1.3rem' }}>📝</span>
-          </div>
-          <div className="mono" style={{ fontSize: '1.8rem', fontWeight: 800, marginBottom: '6px' }}>{total.toLocaleString()}</div>
-          <span className="badge badge-blue" style={{ fontSize: '.7rem' }}>بيانات فيسبوك مفلترة</span>
-        </div>
-
-        {/* CSAT Rating */}
-        <div className="analytics-card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
-            <span style={{ fontSize: '.82rem', color: 'var(--text-secondary)', fontWeight: 600 }}>مؤشر الرضا العام</span>
-            <span style={{ fontSize: '1.3rem' }}>⭐</span>
-          </div>
-          <div className="mono" style={{ fontSize: '1.8rem', fontWeight: 800, color: '#3b82f6', marginBottom: '6px' }}>{csatScore}/10</div>
-          <span className="badge badge-green" style={{ fontSize: '.7rem' }}>صيغة CSAT الموزونة</span>
-        </div>
-
-        {/* Net Promoter Score (NPS) */}
-        <div className="analytics-card" style={{ borderLeft: '3px solid #6366f1' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
-            <span style={{ fontSize: '.82rem', color: 'var(--text-secondary)', fontWeight: 600 }}>صافي الترويج (NPS)</span>
-            <span style={{ fontSize: '1.3rem' }}>📊</span>
-          </div>
-          <div className="mono" style={{ fontSize: '1.8rem', fontWeight: 800, color: npsScore > 0 ? '#10b981' : npsScore < 0 ? '#ef4444' : '#f59e0b', marginBottom: '6px' }}>
-            {npsScore > 0 ? '+' : ''}{npsScore}%
-          </div>
-          <span className={`badge ${npsScore > 0 ? 'badge-green' : npsScore < 0 ? 'badge-red' : 'badge-gray'}`} style={{ fontSize: '.7rem' }}>صافي التقييم العاطفي</span>
-        </div>
-
-        {/* Avg Confidence */}
-        <div className="analytics-card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
-            <span style={{ fontSize: '.82rem', color: 'var(--text-secondary)', fontWeight: 600 }}>ثقة ودقة التحليل</span>
-            <span style={{ fontSize: '1.3rem' }}>🎯</span>
-          </div>
-          <div className="mono" style={{ fontSize: '1.8rem', fontWeight: 800, color: '#4f46e5', marginBottom: '6px' }}>{avgConfidence}%</div>
-          <span className="badge badge-blue" style={{ fontSize: '.7rem' }}>دقة المحرك الهجين</span>
-        </div>
-
-        {/* Positive sentiment */}
-        <div className="analytics-card glow-pos">
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
-            <span style={{ fontSize: '.82rem', color: '#10b981', fontWeight: 600 }}>نصوص إيجابية</span>
-            <span style={{ fontSize: '1.3rem' }}>😊</span>
-          </div>
-          <div className="mono" style={{ fontSize: '1.8rem', fontWeight: 800, color: '#10b981', marginBottom: '6px' }}>{posPct}%</div>
-          <span style={{ fontSize: '.72rem', color: 'var(--text-secondary)' }}>{positive} منشور وتعليق</span>
-        </div>
-
-        {/* Negative sentiment */}
-        <div className="analytics-card glow-neg">
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
-            <span style={{ fontSize: '.82rem', color: '#ef4444', fontWeight: 600 }}>نصوص سلبية</span>
-            <span style={{ fontSize: '1.3rem' }}>😠</span>
-          </div>
-          <div className="mono" style={{ fontSize: '1.8rem', fontWeight: 800, color: '#ef4444', marginBottom: '6px' }}>{negPct}%</div>
-          <span style={{ fontSize: '.72rem', color: 'var(--text-secondary)' }}>{negative} منشور وتعليق</span>
-        </div>
-
-        {/* Sarcasm flag */}
-        <div className="analytics-card" style={{ borderLeft: '3px solid #8b5cf6' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
-            <span style={{ fontSize: '.82rem', color: '#8b5cf6', fontWeight: 600 }}>التهكم والسخرية</span>
-            <span style={{ fontSize: '1.3rem' }}>⚠️</span>
-          </div>
-          <div className="mono" style={{ fontSize: '1.8rem', fontWeight: 800, color: '#8b5cf6', marginBottom: '6px' }}>{sarcasticCount} <span style={{ fontSize: '.9rem', fontWeight: 500, color: 'var(--text-secondary)' }}>({sarcasmRate}%)</span></div>
-          <span className="badge" style={{ fontSize: '.7rem', background: 'rgba(139, 92, 246, 0.15)', color: 'var(--violet)' }}>مرصودة بـ Gemini 🧠</span>
-        </div>
-
-        {/* Engagement Density */}
-        <div className="analytics-card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
-            <span style={{ fontSize: '.82rem', color: 'var(--text-secondary)', fontWeight: 600 }}>كثافة تفاعل الجمهور</span>
-            <span style={{ fontSize: '1.3rem' }}>💬</span>
-          </div>
-          <div className="mono" style={{ fontSize: '1.8rem', fontWeight: 800, color: 'var(--blue)', marginBottom: '6px' }}>{commentsRatio} <span style={{ fontSize: '.9rem', fontWeight: 500, color: 'var(--text-secondary)' }}>تعليق/منشور</span></div>
-          <span className="badge badge-gray" style={{ fontSize: '.7rem' }}>بناءً على {postsCount} منشوراً و {commentsCount} تعليقاً</span>
-        </div>
-
-      </div>
-
-      {/* Main Interactive Charts row */}
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '24px', marginBottom: '24px' }}>
-        
-        {/* Trend Area Chart */}
-        <div className="analytics-card" style={{ padding: '24px' }}>
-          <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '20px', color: 'var(--text-primary)' }}>📈 التطور الزمني للمشاعر المسحوبة</h3>
-          <div style={{ height: '260px', width: '100%' }}>
+      {/* Charts row 1 */}
+      <div className="sent-charts-row sent-charts-row--main">
+        <ChartPanel
+          className="sent-chart-wide"
+          title={`📈 ${t('sentChartTimeline')}`}
+          subtitle={lang === 'ar' ? `${metrics.commentTotal} تعليق في الفترة المحددة` : `${metrics.commentTotal} comments in selected period`}
+          action={
+            <div className="sent-legend-inline">
+              {[SENTIMENT_POSITIVE, SENTIMENT_NEGATIVE, SENTIMENT_NEUTRAL].map((s, i) => (
+                <span key={s} className="sent-legend-item">
+                  <i style={{ background: [COLORS.pos, COLORS.neg, COLORS.neu][i] }} />
+                  {ts(s)}
+                </span>
+              ))}
+            </div>
+          }
+        >
+          <div className="sent-chart-h sent-chart-h--tall">
             {timelineData.length === 0 ? (
-              <div style={{ display: 'flex', height: '100%', alignItems: 'center', justifyContent: 'center', color: '#64748b' }}>لا يوجد سجل زمني مطابق للفلاتر الحالية</div>
+              <div className="sent-empty">{t('sentChartTimelineEmpty')}</div>
             ) : (
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={timelineData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <AreaChart data={timelineData} margin={chartMargin}>
                   <defs>
-                    <linearGradient id="colorPos" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
-                      <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                    <linearGradient id="sentGradPos" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor={COLORS.pos} stopOpacity={0.45} />
+                      <stop offset="100%" stopColor={COLORS.pos} stopOpacity={0} />
                     </linearGradient>
-                    <linearGradient id="colorNeg" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3}/>
-                      <stop offset="95%" stopColor="#ef4444" stopOpacity={0}/>
+                    <linearGradient id="sentGradNeg" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor={COLORS.neg} stopOpacity={0.4} />
+                      <stop offset="100%" stopColor={COLORS.neg} stopOpacity={0} />
                     </linearGradient>
+                    <linearGradient id="sentGradNeu" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor={COLORS.neu} stopOpacity={0.25} />
+                      <stop offset="100%" stopColor={COLORS.neu} stopOpacity={0} />
+                    </linearGradient>
+                    <filter id="sentGlowPos" x="-20%" y="-20%" width="140%" height="140%">
+                      <feGaussianBlur stdDeviation="2" result="blur" />
+                      <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+                    </filter>
                   </defs>
-                  <XAxis dataKey="date" tick={{ fill: '#94a3b8', fontSize: 10 }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fill: '#94a3b8', fontSize: 10 }} axisLine={false} tickLine={false} />
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.04)" vertical={false} />
-                  <Tooltip contentStyle={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text-primary)' }} />
-                  <Legend verticalAlign="top" height={36} iconType="circle" wrapperStyle={{ fontSize: '0.8rem', paddingBottom: '10px' }} />
-                  <Area type="monotone" dataKey="إيجابي" stroke="#10b981" strokeWidth={3} fillOpacity={1} fill="url(#colorPos)" />
-                  <Area type="monotone" dataKey="سلبي" stroke="#ef4444" strokeWidth={3} fillOpacity={1} fill="url(#colorNeg)" />
-                  <Area type="monotone" dataKey="محايد" stroke="#f59e0b" strokeWidth={2} fillOpacity={0} />
+                  <CartesianGrid strokeDasharray="4 8" vertical={false} stroke="var(--border-light)" />
+                  <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'var(--text-tertiary)' }} dy={8} />
+                  <YAxis orientation={yOrient} axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'var(--text-tertiary)' }} width={36} />
+                  <Tooltip content={<ChartTooltip ts={ts} />} cursor={{ stroke: 'var(--border)', strokeWidth: 1, strokeDasharray: '4 4' }} />
+                  <Area type="monotone" dataKey={SENTIMENT_POSITIVE} stroke={COLORS.pos} strokeWidth={2.5} fill="url(#sentGradPos)" animationDuration={1400} activeDot={{ r: 6, stroke: '#fff', strokeWidth: 2, fill: COLORS.pos }} />
+                  <Area type="monotone" dataKey={SENTIMENT_NEGATIVE} stroke={COLORS.neg} strokeWidth={2.5} fill="url(#sentGradNeg)" animationDuration={1600} activeDot={{ r: 6, stroke: '#fff', strokeWidth: 2, fill: COLORS.neg }} />
+                  <Area type="monotone" dataKey={SENTIMENT_NEUTRAL} stroke={COLORS.neu} strokeWidth={2} fill="url(#sentGradNeu)" animationDuration={1800} activeDot={{ r: 5, stroke: '#fff', strokeWidth: 2, fill: COLORS.neu }} />
                 </AreaChart>
               </ResponsiveContainer>
             )}
           </div>
-        </div>
+        </ChartPanel>
 
-        {/* Sentiment Donut Chart */}
-        <div className="analytics-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-          <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '16px', alignSelf: 'flex-start', color: 'var(--text-primary)' }}>🍩 توزيع النسب المئوية</h3>
-          <div style={{ position: 'relative', width: '150px', height: '150px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            {total === 0 ? (
-              <div style={{ color: '#64748b', fontSize: '.8rem' }}>فارغ</div>
+        <ChartPanel
+          title={`🍩 ${t('sentChartPie')}`}
+          subtitle={lang === 'ar' ? 'توزيع المشاعر على التعليقات' : 'Comment sentiment split'}
+        >
+          <div className="sent-donut-wrap">
+            {metrics.commentTotal === 0 ? (
+              <div className="sent-empty">{t('sentChartPieEmpty')}</div>
             ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={pieData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={50}
-                    outerRadius={70}
-                    paddingAngle={3}
-                    dataKey="value"
-                  >
-                    {pieData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip contentStyle={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text-primary)', fontSize: '.8rem' }} />
-                </PieChart>
-              </ResponsiveContainer>
+              <>
+                <div className="sent-donut-chart">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={pieData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius="58%"
+                        outerRadius="82%"
+                        paddingAngle={4}
+                        dataKey="value"
+                        animationBegin={200}
+                        animationDuration={1200}
+                        stroke="var(--bg-card)"
+                        strokeWidth={3}
+                      >
+                        {pieData.map((entry, index) => (
+                          <Cell key={index} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip content={<ChartTooltip ts={ts} />} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="sent-donut-center">
+                    <span className="mono sent-donut-num">{metrics.commentTotal}</span>
+                    <span>{t('sentChartPieCenter')}</span>
+                  </div>
+                </div>
+                <div className="sent-donut-legend">
+                  {[
+                    { key: SENTIMENT_POSITIVE, pct: metrics.posPct, color: COLORS.pos },
+                    { key: SENTIMENT_NEGATIVE, pct: metrics.negPct, color: COLORS.neg },
+                    { key: SENTIMENT_NEUTRAL, pct: metrics.neuPct, color: COLORS.neu },
+                  ].map(lg => (
+                    <div key={lg.key} className="sent-donut-leg-item">
+                      <div className="sent-donut-leg-bar">
+                        <div style={{ width: `${lg.pct}%`, background: lg.color }} />
+                      </div>
+                      <div className="sent-donut-leg-meta">
+                        <span><i style={{ background: lg.color }} />{ts(lg.key)}</span>
+                        <strong className="mono">{lg.pct}%</strong>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
             )}
-            <div style={{ position: 'absolute', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-              <span className="mono" style={{ fontSize: '1.7rem', fontWeight: 800, color: 'var(--text-primary)' }}>{total}</span>
-              <span style={{ fontSize: '.7rem', color: 'var(--text-secondary)' }}>سجل عاطفي</span>
-            </div>
           </div>
-          
-          {/* Small Legend below Donut */}
-          <div style={{ display: 'flex', gap: '14px', marginTop: '16px', flexWrap: 'wrap', justifyContent: 'center' }}>
-            {[
-              { label: 'إيجابي', color: '#10b981', pct: `${posPct}%` },
-              { label: 'سلبي', color: '#ef4444', pct: `${negPct}%` },
-              { label: 'محايد', color: '#f59e0b', pct: `${neuPct}%` }
-            ].map((lg, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '.78rem' }}>
-                <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: lg.color }}></span>
-                <span style={{ color: 'var(--text-secondary)' }}>{lg.label} ({lg.pct})</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
+        </ChartPanel>
       </div>
 
-      {/* Middle row: Topics breakdown stacked chart */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 2fr', gap: '24px', marginBottom: '24px' }}>
-        
-        {/* Dynamic Topic Bar Chart */}
-        <div className="analytics-card">
-          <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '20px', color: 'var(--text-primary)' }}>📊 توزيع المشاعر حسب المواضيع الخمسة الأبرز</h3>
-          <div style={{ height: '240px', width: '100%' }}>
-            {topicData.length === 0 ? (
-              <div style={{ display: 'flex', height: '100%', alignItems: 'center', justifyContent: 'center', color: '#64748b' }}>لا يوجد تصنيف مواضيع مطابق</div>
+      {/* Charts row 2 */}
+      <div className="sent-charts-row sent-charts-row--split">
+        <ChartPanel
+          title={`📊 ${t('sentChartByPost')}`}
+          subtitle={lang === 'ar' ? 'أعلى 5 منشورات حسب عدد التعليقات' : 'Top 5 posts by comment volume'}
+        >
+          <div className="sent-chart-h">
+            {postChartData.length === 0 ? (
+              <div className="sent-empty">{t('sentChartByPostEmpty')}</div>
             ) : (
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={topicData} layout="vertical" margin={{ top: 10, right: 10, left: 20, bottom: 5 }}>
-                  <XAxis type="number" tick={{ fill: '#94a3b8', fontSize: 10 }} axisLine={false} tickLine={false} />
-                  <YAxis dataKey="topic" type="category" tick={{ fill: 'var(--text-primary)', fontSize: 9.5, fontWeight: 600, textAnchor: 'end' }} axisLine={false} tickLine={false} width={150} />
-                  <Tooltip contentStyle={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text-primary)' }} />
-                  <Bar dataKey="إيجابي" stackId="a" fill="#10b981" radius={[0, 4, 4, 0]} />
-                  <Bar dataKey="سلبي" stackId="a" fill="#ef4444" radius={[0, 4, 4, 0]} />
-                  <Bar dataKey="محايد" stackId="a" fill="#f59e0b" radius={[0, 4, 4, 0]} />
+                <BarChart data={postChartData} layout="vertical" margin={{ top: 4, right: 12, left: 4, bottom: 4 }} barCategoryGap="18%">
+                  <defs>
+                    <linearGradient id="barPos" x1="0" y1="0" x2="1" y2="0">
+                      <stop offset="0%" stopColor={COLORS.pos} /><stop offset="100%" stopColor={COLORS.posLight} />
+                    </linearGradient>
+                    <linearGradient id="barNeg" x1="0" y1="0" x2="1" y2="0">
+                      <stop offset="0%" stopColor={COLORS.neg} /><stop offset="100%" stopColor={COLORS.negLight} />
+                    </linearGradient>
+                    <linearGradient id="barNeu" x1="0" y1="0" x2="1" y2="0">
+                      <stop offset="0%" stopColor={COLORS.neu} /><stop offset="100%" stopColor={COLORS.neuLight} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="4 8" horizontal={false} stroke="var(--border-light)" />
+                  <XAxis type="number" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: 'var(--text-tertiary)' }} />
+                  <YAxis
+                    dataKey="postLabel"
+                    type="category"
+                    width={isRTL ? 130 : 140}
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fontSize: 10, fill: 'var(--text-primary)', fontWeight: 600 }}
+                  />
+                  <Tooltip content={<ChartTooltip ts={ts} />} cursor={{ fill: 'rgba(37, 99, 235, 0.06)' }} />
+                  <Legend
+                    verticalAlign="top"
+                    align={isRTL ? 'left' : 'right'}
+                    iconType="circle"
+                    iconSize={8}
+                    wrapperStyle={{ fontSize: '0.75rem', paddingBottom: 8 }}
+                    formatter={(value) => ts(value)}
+                  />
+                  <Bar dataKey={SENTIMENT_POSITIVE} stackId="a" fill="url(#barPos)" radius={[0, 0, 0, 0]} animationDuration={1000} />
+                  <Bar dataKey={SENTIMENT_NEGATIVE} stackId="a" fill="url(#barNeg)" animationDuration={1200} />
+                  <Bar dataKey={SENTIMENT_NEUTRAL} stackId="a" fill="url(#barNeu)" radius={[0, 6, 6, 0]} animationDuration={1400}>
+                    <LabelList dataKey="total" position="right" style={{ fontSize: 10, fill: 'var(--text-tertiary)', fontWeight: 700 }} />
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             )}
           </div>
-        </div>
+        </ChartPanel>
 
-        {/* Live dynamic text explorer */}
-        <div className="analytics-card" style={{ display: 'flex', flexDirection: 'column', height: '308px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-            <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>🔍 مستكشف السجلات العاطفية المصفّرة</h3>
-            <span className="badge badge-gray" style={{ fontSize: '.75rem' }}>{filteredData.length} نتيجة مطابقة</span>
-          </div>
-
-          {/* List Wrapper */}
-          <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px', paddingRight: '4px' }}>
-            {filteredData.slice(0, 8).map(item => (
-              <div key={item.id} style={{ background: 'var(--bg)', border: '1px solid var(--border)', padding: '12px 14px', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', gap: '14px', alignItems: 'flex-start', transition: 'all 0.15s' }}>
-                <div style={{ flex: 1 }}>
-                  <p style={{ margin: '0 0 6px 0', fontSize: '.85rem', color: 'var(--text-primary)', lineHeight: 1.6, fontWeight: 500 }}>{item.content}</p>
-                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
-                    <span className="badge badge-gray" style={{ fontSize: '.65rem', padding: '2px 6px' }}>{item.type === 'post' ? '📄 منشور' : '💬 تعليق'}</span>
-                    <span className="badge badge-blue" style={{ fontSize: '.62rem', padding: '2px 6px' }}>📌 {item.topic}</span>
-                    {item.is_sarcastic && <span className="badge" style={{ fontSize: '.62rem', padding: '2px 6px', background: 'rgba(139, 92, 246, 0.2)', color: 'var(--violet)' }}>⚠️ سخرية</span>}
-                    <span style={{ fontSize: '.7rem', color: '#64748b' }}>{item.engine_used && (item.engine_used.toLowerCase().includes('gemini') || item.engine_used.toLowerCase().includes('ai')) ? 'تم استخدام الـ AI' : (item.engine_used || 'المحرك المحلي')}</span>
-                  </div>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px', flexShrink: 0 }}>
-                  <span style={{ 
-                    fontSize: '.78rem', 
-                    fontWeight: 800, 
-                    color: item.sentiment === 'إيجابي' ? '#10b981' : item.sentiment === 'سلبي' ? '#ef4444' : '#f59e0b',
-                    background: item.sentiment === 'إيجابي' ? 'rgba(16, 185, 129, 0.1)' : item.sentiment === 'سلبي' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(245, 158, 11, 0.1)',
-                    padding: '3px 8px',
-                    borderRadius: '4px'
-                  }}>
-                    {item.sentiment}
-                  </span>
-                  {item.engine_used && !(item.engine_used.toLowerCase().includes('gemini') || item.engine_used.toLowerCase().includes('ai')) && (
-                    <span className="mono" style={{ fontSize: '.72rem', color: 'var(--text-secondary)' }}>{(item.score * 100).toFixed(0)}%</span>
-                  )}
-                </div>
-              </div>
-            ))}
-            {filteredData.length === 0 && (
-              <div style={{ padding: '40px', textAlign: 'center', color: '#64748b', fontSize: '.85rem' }}>لا يوجد سجلات تطابق الفلاتر النشطة</div>
+        <ChartPanel
+          className="sent-explorer-panel"
+          title={`🔍 ${t('sentExplorerTitle')}`}
+          action={<span className="sent-count-badge">{t('sentExplorerResults', { count: filteredData.length })}</span>}
+        >
+          <div className="sent-explorer-list">
+            {filteredData.length === 0 ? (
+              <div className="sent-empty">{t('sentExplorerEmpty')}</div>
+            ) : (
+              filteredData.slice(0, 10).map((item, idx) => {
+                const sentColor = item.sentiment === SENTIMENT_POSITIVE ? COLORS.pos
+                  : item.sentiment === SENTIMENT_NEGATIVE ? COLORS.neg : COLORS.neu
+                return (
+                  <article
+                    key={item.id}
+                    className="sent-explorer-item animate-fade-up"
+                    style={{ animationDelay: `${idx * 0.04}s`, '--accent': sentColor }}
+                  >
+                    <div className="sent-explorer-accent" />
+                    <div className="sent-explorer-content">
+                      <p>{item.content}</p>
+                      <div className="sent-explorer-meta">
+                        <span className="sent-tag sent-tag--type">
+                          {item.type === 'post' ? `📄 ${t('sentExplorerPost')}` : `💬 ${t('sentExplorerComment')}`}
+                        </span>
+                        {item.type === 'post' && item.topic && (
+                          <span className="sent-tag sent-tag--topic">📌 {topicLabel(item.topic)}</span>
+                        )}
+                        <span className="sent-tag sent-tag--engine">
+                          {isGeminiEngine(item.engine_used) ? `✨ ${t('sentExplorerAiUsed')}` : `⚡ ${t('sentExplorerLocalEngine')}`}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="sent-explorer-side">
+                      <span className="sent-sent-badge" style={{ color: sentColor, borderColor: `${sentColor}40`, background: `${sentColor}14` }}>
+                        {ts(item.sentiment)}
+                      </span>
+                      {!isGeminiEngine(item.engine_used) && (
+                        <span className="mono sent-score">{(item.score * 100).toFixed(0)}%</span>
+                      )}
+                    </div>
+                  </article>
+                )
+              })
             )}
           </div>
-        </div>
-
+        </ChartPanel>
       </div>
 
+      <style>{`
+        .sent-page { --sent-radius: 20px; padding-bottom: 40px; }
+
+        .sent-loading {
+          display: flex; flex-direction: column; align-items: center; justify-content: center;
+          min-height: 420px; gap: 20px; color: var(--text-secondary);
+        }
+        .sent-loading-ring {
+          width: 52px; height: 52px; border-radius: 50%;
+          border: 3px solid var(--border);
+          border-top-color: var(--blue);
+          animation: sentSpin .9s linear infinite;
+        }
+        @keyframes sentSpin { to { transform: rotate(360deg); } }
+
+        .sent-error {
+          padding: 24px; background: var(--red-light); color: var(--red);
+          border-radius: var(--radius); border: 1px solid rgba(220,38,38,.2);
+        }
+
+        /* Hero */
+        .sent-hero {
+          position: relative; overflow: hidden; border-radius: var(--sent-radius);
+          margin-bottom: 24px; padding: 28px 32px;
+          background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 42%, #1e40af 100%);
+          color: #fff; box-shadow: 0 20px 50px -12px rgba(15, 23, 42, 0.45);
+        }
+        .sent-hero-mesh {
+          position: absolute; inset: 0;
+          background:
+            radial-gradient(ellipse 80% 60% at 10% 20%, rgba(16, 185, 129, 0.35), transparent),
+            radial-gradient(ellipse 60% 50% at 90% 80%, rgba(99, 102, 241, 0.4), transparent),
+            radial-gradient(ellipse 50% 40% at 70% 10%, rgba(37, 99, 235, 0.3), transparent);
+          pointer-events: none;
+        }
+        .sent-hero-grid {
+          position: absolute; inset: 0; opacity: 0.12;
+          background-image: linear-gradient(rgba(255,255,255,.15) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255,255,255,.15) 1px, transparent 1px);
+          background-size: 32px 32px; pointer-events: none;
+        }
+        .sent-hero-inner {
+          position: relative; z-index: 1;
+          display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 24px;
+        }
+        .sent-hero h1 { font-size: 1.75rem; font-weight: 800; color: #fff; margin: 10px 0 8px; letter-spacing: -0.02em; }
+        .sent-hero p { color: rgba(255,255,255,.75); font-size: .92rem; max-width: 520px; margin: 0; }
+        .sent-hero-pill {
+          display: inline-flex; align-items: center; gap: 8px;
+          padding: 5px 14px; border-radius: 100px; font-size: .72rem; font-weight: 700;
+          background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.2);
+          backdrop-filter: blur(8px);
+        }
+        .sent-hero-pulse {
+          width: 7px; height: 7px; border-radius: 50%; background: #34d399;
+          box-shadow: 0 0 12px #34d399; animation: sentPulse 2s ease infinite;
+        }
+        @keyframes sentPulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .6; transform: scale(.85); } }
+
+        .sent-hero-actions { display: flex; flex-direction: column; gap: 12px; align-items: flex-end; }
+        .sent-time-tabs {
+          display: flex; gap: 4px; padding: 4px; border-radius: 12px;
+          background: rgba(0,0,0,.25); border: 1px solid rgba(255,255,255,.12);
+        }
+        .sent-time-tab {
+          padding: 8px 16px; border: none; border-radius: 9px; font-size: .8rem; font-weight: 600;
+          font-family: inherit; cursor: pointer; color: rgba(255,255,255,.65);
+          background: transparent; transition: all .2s;
+        }
+        .sent-time-tab:hover { color: #fff; background: rgba(255,255,255,.08); }
+        .sent-time-tab.active {
+          background: #fff; color: #1e40af; box-shadow: 0 4px 14px rgba(0,0,0,.15);
+        }
+        .sent-sentiment-pills { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
+        .sent-pill {
+          padding: 6px 12px; border-radius: 100px; font-size: .72rem; font-weight: 700;
+          border: 1px solid rgba(255,255,255,.2); background: rgba(0,0,0,.2);
+          color: rgba(255,255,255,.8); cursor: pointer; font-family: inherit; transition: all .2s;
+        }
+        .sent-pill:hover { border-color: rgba(255,255,255,.4); color: #fff; }
+        .sent-pill.active {
+          background: var(--pill-color); border-color: transparent; color: #fff;
+          box-shadow: 0 4px 16px color-mix(in srgb, var(--pill-color) 50%, transparent);
+        }
+
+        /* Filters */
+        .sent-filters {
+          display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 24px;
+          padding: 18px 20px; background: var(--bg-card);
+          border: 1px solid var(--border); border-radius: var(--sent-radius);
+          box-shadow: var(--shadow-sm);
+        }
+        @media (max-width: 960px) { .sent-filters { grid-template-columns: 1fr 1fr; } }
+        @media (max-width: 520px) { .sent-filters { grid-template-columns: 1fr; } }
+        .sent-filter-field label {
+          display: block; font-size: .72rem; font-weight: 700; color: var(--text-tertiary);
+          margin-bottom: 8px; text-transform: uppercase; letter-spacing: .04em;
+        }
+        .sent-select, .sent-search {
+          width: 100%; padding: 11px 14px; border-radius: 10px;
+          border: 1px solid var(--border); background: var(--bg);
+          color: var(--text-primary); font-size: .85rem; font-weight: 600;
+          font-family: inherit; outline: none; transition: border-color .2s, box-shadow .2s;
+        }
+        .sent-select:focus, .sent-search:focus {
+          border-color: var(--blue); box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+        }
+
+        /* KPI */
+        .sent-kpi-grid {
+          display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px;
+        }
+        @media (max-width: 900px) { .sent-kpi-grid { grid-template-columns: repeat(2, 1fr); } }
+        @media (max-width: 520px) { .sent-kpi-grid { grid-template-columns: 1fr; } }
+
+        .sent-kpi {
+          position: relative; overflow: hidden; padding: 22px 22px 18px;
+          background: var(--bg-card); border: 1px solid var(--border);
+          border-radius: var(--sent-radius); transition: transform .25s, box-shadow .25s;
+        }
+        .sent-kpi:hover { transform: translateY(-3px); box-shadow: var(--shadow-lg); }
+        .sent-kpi-glow {
+          position: absolute; top: -40px; width: 120px; height: 120px; border-radius: 50%;
+          opacity: .35; filter: blur(40px); pointer-events: none;
+        }
+        .sent-kpi--blue .sent-kpi-glow { right: -20px; background: ${COLORS.blue}; }
+        .sent-kpi--indigo .sent-kpi-glow { right: -20px; background: ${COLORS.indigo}; }
+        .sent-kpi--violet .sent-kpi-glow { right: -20px; background: ${COLORS.violet}; }
+        .sent-kpi--green .sent-kpi-glow { right: -20px; background: ${COLORS.pos}; }
+        .sent-kpi--red .sent-kpi-glow { right: -20px; background: ${COLORS.neg}; }
+        .sent-kpi--cyan .sent-kpi-glow { right: -20px; background: #06b6d4; }
+        .sent-kpi--blue { border-top: 3px solid ${COLORS.blue}; }
+        .sent-kpi--indigo { border-top: 3px solid ${COLORS.indigo}; }
+        .sent-kpi--violet { border-top: 3px solid ${COLORS.violet}; }
+        .sent-kpi--green { border-top: 3px solid ${COLORS.pos}; }
+        .sent-kpi--red { border-top: 3px solid ${COLORS.neg}; }
+        .sent-kpi--cyan { border-top: 3px solid #06b6d4; }
+
+        .sent-kpi-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px; }
+        .sent-kpi-label { font-size: .8rem; font-weight: 700; color: var(--text-secondary); max-width: 70%; line-height: 1.4; }
+        .sent-kpi-icon { font-size: 1.35rem; opacity: .9; }
+        .sent-kpi-value { font-size: 2rem; font-weight: 800; letter-spacing: -0.03em; margin-bottom: 10px; color: var(--text-primary); }
+        .sent-kpi-bar { height: 4px; border-radius: 4px; background: var(--bg-elevated); overflow: hidden; margin-bottom: 10px; }
+        .sent-kpi-bar-fill { height: 100%; border-radius: 4px; background: linear-gradient(90deg, var(--blue), #8b5cf6); transition: width .8s cubic-bezier(.22,1,.36,1); }
+        .sent-kpi--green .sent-kpi-bar-fill { background: linear-gradient(90deg, ${COLORS.pos}, ${COLORS.posLight}); }
+        .sent-kpi--red .sent-kpi-bar-fill { background: linear-gradient(90deg, ${COLORS.neg}, ${COLORS.negLight}); }
+        .sent-kpi--indigo .sent-kpi-bar-fill { background: linear-gradient(90deg, ${COLORS.indigo}, ${COLORS.violet}); }
+        .sent-kpi--violet .sent-kpi-bar-fill { background: linear-gradient(90deg, ${COLORS.violet}, #a78bfa); }
+        .sent-kpi-sub { font-size: .72rem; color: var(--text-tertiary); line-height: 1.5; }
+        .sent-kpi-unit { font-weight: 600; color: var(--text-secondary); }
+
+        /* Chart panels */
+        .sent-charts-row { display: grid; gap: 20px; margin-bottom: 20px; }
+        .sent-charts-row--main { grid-template-columns: 1.65fr 1fr; }
+        .sent-charts-row--split { grid-template-columns: 1fr 1.35fr; }
+        @media (max-width: 1024px) {
+          .sent-charts-row--main, .sent-charts-row--split { grid-template-columns: 1fr; }
+        }
+
+        .sent-chart-panel {
+          background: var(--bg-card); border: 1px solid var(--border);
+          border-radius: var(--sent-radius); padding: 24px 26px;
+          box-shadow: var(--shadow-sm);
+        }
+        .sent-chart-head {
+          display: flex; justify-content: space-between; align-items: flex-start;
+          gap: 16px; margin-bottom: 20px; flex-wrap: wrap;
+        }
+        .sent-chart-title { font-size: 1.05rem; font-weight: 800; margin: 0 0 4px; letter-spacing: -0.01em; }
+        .sent-chart-sub { font-size: .8rem; color: var(--text-tertiary); margin: 0; }
+        .sent-chart-h { height: 300px; width: 100%; }
+        .sent-chart-h--tall { height: 320px; }
+
+        .sent-legend-inline { display: flex; flex-wrap: wrap; gap: 12px; }
+        .sent-legend-item {
+          display: flex; align-items: center; gap: 6px; font-size: .75rem;
+          font-weight: 600; color: var(--text-secondary);
+        }
+        .sent-legend-item i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+
+        .sent-tooltip {
+          background: var(--bg-card); border: 1px solid var(--border);
+          border-radius: 12px; padding: 12px 14px; box-shadow: var(--shadow-lg);
+          min-width: 140px;
+        }
+        .sent-tooltip-label { font-size: .75rem; color: var(--text-tertiary); margin-bottom: 8px; font-weight: 600; }
+        .sent-tooltip-rows { display: flex; flex-direction: column; gap: 6px; }
+        .sent-tooltip-row { display: flex; align-items: center; gap: 8px; font-size: .82rem; }
+        .sent-tooltip-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+        .sent-tooltip-name { flex: 1; color: var(--text-secondary); font-weight: 600; }
+        .sent-tooltip-val { font-weight: 800; color: var(--text-primary); }
+
+        .sent-empty {
+          height: 100%; min-height: 200px; display: flex; align-items: center; justify-content: center;
+          color: var(--text-tertiary); font-size: .88rem; text-align: center; padding: 24px;
+          background: var(--bg); border-radius: 12px; border: 1px dashed var(--border);
+        }
+
+        /* Donut */
+        .sent-donut-wrap { display: flex; flex-direction: column; align-items: center; gap: 20px; }
+        .sent-donut-chart { position: relative; width: 100%; max-width: 220px; height: 220px; }
+        .sent-donut-center {
+          position: absolute; inset: 0; display: flex; flex-direction: column;
+          align-items: center; justify-content: center; pointer-events: none;
+        }
+        .sent-donut-num { font-size: 2rem; font-weight: 800; line-height: 1; color: var(--text-primary); }
+        .sent-donut-center span:last-child { font-size: .72rem; color: var(--text-tertiary); margin-top: 4px; font-weight: 600; }
+        .sent-donut-legend { width: 100%; display: flex; flex-direction: column; gap: 12px; }
+        .sent-donut-leg-bar { height: 5px; border-radius: 5px; background: var(--bg-elevated); overflow: hidden; margin-bottom: 6px; }
+        .sent-donut-leg-bar div { height: 100%; border-radius: 5px; transition: width .9s cubic-bezier(.22,1,.36,1); }
+        .sent-donut-leg-meta { display: flex; justify-content: space-between; align-items: center; font-size: .8rem; }
+        .sent-donut-leg-meta span { display: flex; align-items: center; gap: 8px; color: var(--text-secondary); font-weight: 600; }
+        .sent-donut-leg-meta i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+        .sent-donut-leg-meta strong { color: var(--text-primary); }
+
+        /* Explorer */
+        .sent-explorer-panel .sent-chart-body { padding: 0; }
+        .sent-count-badge {
+          font-size: .72rem; font-weight: 700; padding: 6px 12px; border-radius: 100px;
+          background: var(--bg-elevated); color: var(--text-secondary); border: 1px solid var(--border);
+        }
+        .sent-explorer-list {
+          display: flex; flex-direction: column; gap: 10px;
+          max-height: 340px; overflow-y: auto; padding-inline-end: 4px;
+        }
+        .sent-explorer-list::-webkit-scrollbar { width: 5px; }
+        .sent-explorer-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+        .sent-explorer-item {
+          position: relative; display: flex; gap: 14px; padding: 14px 16px 14px 18px;
+          background: var(--bg); border: 1px solid var(--border-light);
+          border-radius: 14px; transition: border-color .2s, box-shadow .2s, transform .2s;
+        }
+        .sent-explorer-item:hover {
+          border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+          box-shadow: 0 8px 24px rgba(0,0,0,.04); transform: translateX(${isRTL ? '-2px' : '2px'});
+        }
+        .sent-explorer-accent {
+          position: absolute; top: 12px; bottom: 12px; width: 3px; border-radius: 3px;
+          background: var(--accent); ${isRTL ? 'right: 8px;' : 'left: 8px;'}
+        }
+        .sent-explorer-content { flex: 1; min-width: 0; padding-${isRTL ? 'right' : 'left'}: 8px; }
+        .sent-explorer-content p {
+          margin: 0 0 10px; font-size: .86rem; line-height: 1.65; font-weight: 500;
+          color: var(--text-primary);
+          display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+        }
+        .sent-explorer-meta { display: flex; flex-wrap: wrap; gap: 6px; }
+        .sent-tag {
+          font-size: .65rem; font-weight: 700; padding: 3px 8px; border-radius: 6px;
+        }
+        .sent-tag--type { background: var(--bg-elevated); color: var(--text-secondary); }
+        .sent-tag--topic { background: var(--blue-soft); color: var(--blue); }
+        .sent-tag--engine { color: var(--text-tertiary); }
+        .sent-explorer-side { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex-shrink: 0; }
+        .sent-sent-badge {
+          font-size: .75rem; font-weight: 800; padding: 5px 10px; border-radius: 8px; border: 1px solid;
+        }
+        .sent-score { font-size: .72rem; color: var(--text-tertiary); }
+      `}</style>
     </div>
   )
 }
