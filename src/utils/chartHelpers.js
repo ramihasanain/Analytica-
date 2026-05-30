@@ -115,6 +115,54 @@ export function buildContinuousDailySeries({
   return Array.from(buckets.values()).sort((a, b) => a.rawDate - b.rawDate)
 }
 
+/** Daily series from first to last item date only (no padding to today or filter window). */
+export function buildDataBoundedDailySeries({
+  items = [],
+  getDate,
+  applyItem,
+  seedRow = emptySentimentCounts,
+}) {
+  if (!items?.length) return []
+
+  const times = items
+    .map(getDate)
+    .filter(Boolean)
+    .map((d) => new Date(d))
+    .filter((d) => !Number.isNaN(d.getTime()))
+
+  if (!times.length) return []
+
+  const dataMax = new Date(Math.max(...times.map((d) => d.getTime())))
+  const dataMin = new Date(Math.min(...times.map((d) => d.getTime())))
+  dataMax.setHours(0, 0, 0, 0)
+  dataMin.setHours(0, 0, 0, 0)
+
+  const buckets = new Map()
+  const cursor = new Date(dataMin)
+  while (cursor <= dataMax) {
+    const key = dayKey(cursor)
+    buckets.set(key, { dateKey: key, rawDate: new Date(cursor), ...seedRow() })
+    cursor.setDate(cursor.getDate() + 1)
+  }
+
+  items.forEach((item) => {
+    const raw = getDate(item)
+    if (!raw) return
+    const key = dayKey(raw)
+    if (!buckets.has(key)) return
+    applyItem(buckets.get(key), item)
+  })
+
+  return Array.from(buckets.values()).sort((a, b) => a.rawDate - b.rawDate)
+}
+
+export function maxSeriesPeak(rows, keys = [CHART_KEY_POS, CHART_KEY_NEG, CHART_KEY_NEU]) {
+  return rows.reduce((max, row) => {
+    const peak = keys.reduce((m, k) => Math.max(m, row[k] || 0), 0)
+    return Math.max(max, peak)
+  }, 0)
+}
+
 export function maxStackTotal(rows, keys = [CHART_KEY_POS, CHART_KEY_NEG, CHART_KEY_NEU]) {
   return rows.reduce((max, row) => {
     const sum = keys.reduce((s, k) => s + (row[k] || 0), 0)

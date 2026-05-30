@@ -3,21 +3,20 @@ import api from '../../services/api'
 import { useLanguage } from '../../LanguageContext'
 import { SENTIMENT_POSITIVE, SENTIMENT_NEGATIVE, SENTIMENT_NEUTRAL, TOPIC_UNSPECIFIED, isGeminiEngine } from '../../utils/i18nHelpers'
 import {
-  buildContinuousDailySeries,
+  buildDataBoundedDailySeries,
   emptySentimentCounts,
   sentimentLabelToChartKey,
   formatChartDayLabel,
   niceAxisMax,
-  maxStackTotal,
+  maxSeriesPeak,
   toPercentStack,
-  resolveTimelineDays,
   CHART_KEY_POS,
   CHART_KEY_NEG,
   CHART_KEY_NEU,
 } from '../../utils/chartHelpers'
 import { DashboardChartTooltip, SentimentGradients, chartKeyToLabel } from '../../components/dashboard/DashboardCharts'
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend, Label
 } from 'recharts'
 
@@ -156,11 +155,6 @@ const SentimentAnalytics = () => {
 
   const filteredComments = useMemo(() => filteredData.filter(i => i.type === 'comment'), [filteredData])
 
-  const timelineDays = useMemo(
-    () => resolveTimelineDays(timeRange, filteredComments, (item) => item.raw_date),
-    [timeRange, filteredComments]
-  )
-
   const metrics = useMemo(() => {
     const commentTotal = filteredComments.length
     const commentPositive = filteredComments.filter(i => i.sentiment === SENTIMENT_POSITIVE).length
@@ -191,10 +185,9 @@ const SentimentAnalytics = () => {
   ].filter(item => item.value > 0), [metrics])
 
   const timelineData = useMemo(() => {
-    const rows = buildContinuousDailySeries({
+    const rows = buildDataBoundedDailySeries({
       items: filteredComments,
       getDate: (item) => item.raw_date,
-      days: timelineDays,
       seedRow: emptySentimentCounts,
       applyItem: (row, item) => {
         const k = sentimentLabelToChartKey(item.sentiment)
@@ -206,9 +199,24 @@ const SentimentAnalytics = () => {
       ...r,
       date: formatChartDayLabel(r.rawDate, chartLocale),
     }))
-  }, [filteredComments, chartLocale, timelineDays])
+  }, [filteredComments, chartLocale])
 
-  const timelineYMax = useMemo(() => niceAxisMax(maxStackTotal(timelineData)), [timelineData])
+  const timelineRangeLabel = useMemo(() => {
+    if (timelineData.length === 0) return ''
+    const first = formatChartDayLabel(timelineData[0].rawDate, chartLocale)
+    const last = formatChartDayLabel(timelineData[timelineData.length - 1].rawDate, chartLocale)
+    if (first === last) return first
+    return lang === 'ar' ? `من ${first} إلى ${last}` : `${first} – ${last}`
+  }, [timelineData, chartLocale, lang])
+
+  const timelineYMax = useMemo(() => niceAxisMax(maxSeriesPeak(timelineData)), [timelineData])
+
+  const timelineLineDot = (color) => ({
+    r: 4,
+    strokeWidth: 2,
+    fill: '#fff',
+    stroke: color,
+  })
 
   const topicChartData = useMemo(() => {
     const groups = {}
@@ -399,7 +407,13 @@ const SentimentAnalytics = () => {
         <ChartPanel
           className="sent-chart-wide"
           title={`📈 ${t('sentChartTimeline')}`}
-          subtitle={lang === 'ar' ? `${metrics.commentTotal} تعليق في الفترة المحددة` : `${metrics.commentTotal} comments in selected period`}
+          subtitle={
+            timelineRangeLabel
+              ? (lang === 'ar'
+                ? `${metrics.commentTotal} تعليق · ${timelineRangeLabel}`
+                : `${metrics.commentTotal} comments · ${timelineRangeLabel}`)
+              : (lang === 'ar' ? 'لا توجد تعليقات في الفترة' : 'No comments in this period')
+          }
           action={
             <div className="sent-legend-inline">
               {[SENTIMENT_POSITIVE, SENTIMENT_NEGATIVE, SENTIMENT_NEUTRAL].map((s, i) => (
@@ -416,36 +430,69 @@ const SentimentAnalytics = () => {
               <div className="sent-empty">{t('sentChartTimelineEmpty')}</div>
             ) : (
               <ResponsiveContainer width="100%" height="100%" minHeight={320}>
-                <BarChart data={timelineData} margin={chartMargin}>
-                  <CartesianGrid strokeDasharray="4 8" vertical={false} stroke="var(--border-light)" />
+                <LineChart data={timelineData} margin={chartMargin}>
+                  <CartesianGrid strokeDasharray="3 6" stroke="var(--border-light)" />
                   <XAxis
                     dataKey="date"
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fontSize: 11, fill: 'var(--text-tertiary)' }}
+                    axisLine={{ stroke: 'var(--border)' }}
+                    tickLine={{ stroke: 'var(--border)' }}
+                    tick={{ fontSize: 11, fill: 'var(--text-secondary)', fontWeight: 600 }}
                     dy={8}
-                    minTickGap={20}
-                    interval="preserveStartEnd"
+                    minTickGap={12}
+                    interval={timelineData.length <= 12 ? 0 : 'preserveStartEnd'}
                   />
                   <YAxis
                     orientation={yOrient}
-                    axisLine={false}
+                    axisLine={{ stroke: 'var(--border)' }}
                     tickLine={false}
                     tick={{ fontSize: 11, fill: 'var(--text-tertiary)' }}
-                    width={40}
+                    width={44}
                     allowDecimals={false}
                     domain={[0, Math.max(timelineYMax, 1)]}
+                    label={{
+                      value: lang === 'ar' ? 'عدد التعليقات' : 'Comments',
+                      angle: -90,
+                      position: isRTL ? 'insideRight' : 'insideLeft',
+                      style: { fontSize: 10, fill: 'var(--text-tertiary)' },
+                    }}
                   />
                   <Tooltip
                     content={({ active, payload, label }) => (
                       <DashboardChartTooltip active={active} payload={payload} label={label} ts={ts} showPercent />
                     )}
-                    cursor={{ fill: 'rgba(37, 99, 235, 0.06)' }}
+                    cursor={{ stroke: 'var(--border)', strokeWidth: 1, strokeDasharray: '4 4' }}
                   />
-                  <Bar dataKey={CHART_KEY_POS} stackId="sent" fill={COLORS.pos} radius={[0, 0, 0, 0]} animationDuration={900} />
-                  <Bar dataKey={CHART_KEY_NEU} stackId="sent" fill={COLORS.neu} animationDuration={1100} />
-                  <Bar dataKey={CHART_KEY_NEG} stackId="sent" fill={COLORS.neg} radius={[4, 4, 0, 0]} animationDuration={1300} />
-                </BarChart>
+                  <Line
+                    type="monotone"
+                    dataKey={CHART_KEY_POS}
+                    name={CHART_KEY_POS}
+                    stroke={COLORS.pos}
+                    strokeWidth={2.5}
+                    dot={timelineLineDot(COLORS.pos)}
+                    activeDot={{ r: 6, fill: COLORS.pos, stroke: '#fff', strokeWidth: 2 }}
+                    animationDuration={800}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey={CHART_KEY_NEU}
+                    name={CHART_KEY_NEU}
+                    stroke={COLORS.neu}
+                    strokeWidth={2.5}
+                    dot={timelineLineDot(COLORS.neu)}
+                    activeDot={{ r: 6, fill: COLORS.neu, stroke: '#fff', strokeWidth: 2 }}
+                    animationDuration={1000}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey={CHART_KEY_NEG}
+                    name={CHART_KEY_NEG}
+                    stroke={COLORS.neg}
+                    strokeWidth={2.5}
+                    dot={timelineLineDot(COLORS.neg)}
+                    activeDot={{ r: 6, fill: COLORS.neg, stroke: '#fff', strokeWidth: 2 }}
+                    animationDuration={1200}
+                  />
+                </LineChart>
               </ResponsiveContainer>
             )}
           </div>
