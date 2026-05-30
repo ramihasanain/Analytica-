@@ -1,12 +1,15 @@
 import { useState, useEffect, useMemo } from 'react'
 import api from '../../services/api'
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import { useDashPage, PageHero, DashKpi, DashCard, DashLoading } from '../../components/dashboard/DashboardUI'
 import {
   CHART_KEY_POS, CHART_KEY_NEG, CHART_KEY_NEU,
-  formatChartDayLabel, niceAxisMax, maxStackTotal,
+  niceAxisMax, maxSeriesPeak,
+  prepareOverviewChartSeries,
 } from '../../utils/chartHelpers'
-import { DashboardChartTooltip, SentimentGradients, SENTIMENT_CHART_COLORS, chartKeyToLabel } from '../../components/dashboard/DashboardCharts'
+import { DashboardChartTooltip, SENTIMENT_CHART_COLORS, chartKeyToLabel } from '../../components/dashboard/DashboardCharts'
+
+const OV_COLORS = { posts: '#2563eb', comments: '#8b5cf6' }
 
 const Overview = () => {
   const [stats, setStats] = useState(null)
@@ -39,27 +42,52 @@ const Overview = () => {
     fetchJobs()
   }, [])
 
-  const timelineChart = useMemo(() => (
-    stats?.timeline?.map((row) => ({
-      ...row,
-      label: formatChartDayLabel(row.date, chartLocale),
-    })) ?? []
-  ), [stats, chartLocale])
+  const { chartData, granularity, sourceDays } = useMemo(
+    () => prepareOverviewChartSeries(stats?.timeline ?? [], chartLocale),
+    [stats, chartLocale]
+  )
 
   const timelineRangeLabel = useMemo(() => {
-    if (timelineChart.length === 0) return ''
-    const first = timelineChart[0].label
-    const last = timelineChart[timelineChart.length - 1].label
+    if (chartData.length === 0) return ''
+    const first = chartData[0].label
+    const last = chartData[chartData.length - 1].label
     if (first === last) return first
     return lang === 'ar' ? `من ${first} إلى ${last}` : `${first} – ${last}`
-  }, [timelineChart, lang])
+  }, [chartData, lang])
+
+  const chartSubtitle = useMemo(() => {
+    if (!chartData.length) return ''
+    if (granularity === 'week') {
+      return lang === 'ar'
+        ? `${sourceDays} يوم نشاط · ${chartData.length} أسابيع · ${timelineRangeLabel}`
+        : `${sourceDays} active days · ${chartData.length} weeks · ${timelineRangeLabel}`
+    }
+    return lang === 'ar'
+      ? `${sourceDays} ${sourceDays === 1 ? 'يوم' : 'أيام'} بها بيانات · ${timelineRangeLabel}`
+      : `${sourceDays} active ${sourceDays === 1 ? 'day' : 'days'} · ${timelineRangeLabel}`
+  }, [chartData.length, granularity, sourceDays, timelineRangeLabel, lang])
 
   const volumeYMax = useMemo(() => {
-    const peak = timelineChart.reduce((m, d) => Math.max(m, d.posts, d.comments), 0)
+    const peak = chartData.reduce((m, d) => Math.max(m, d.posts || 0, d.comments || 0), 0)
     return niceAxisMax(peak)
-  }, [timelineChart])
+  }, [chartData])
 
-  const sentimentYMax = useMemo(() => niceAxisMax(maxStackTotal(timelineChart)), [timelineChart])
+  const sentimentYMax = useMemo(() => niceAxisMax(maxSeriesPeak(chartData)), [chartData])
+
+  const tickInterval = chartData.length <= 8 ? 0 : Math.ceil(chartData.length / 7) - 1
+  const chartMargin = {
+    top: 16,
+    right: isRTL ? 12 : 20,
+    left: isRTL ? 20 : 12,
+    bottom: chartData.length > 8 ? 36 : 12,
+  }
+
+  const lineDot = (color) => ({
+    r: 4,
+    strokeWidth: 2,
+    fill: '#fff',
+    stroke: color,
+  })
 
   if (loading) {
     return (
@@ -77,7 +105,6 @@ const Overview = () => {
     )
   }
 
-  const chartMargin = { top: 16, right: isRTL ? 12 : 16, left: isRTL ? 16 : 12, bottom: 8 }
   const volumeName = (key) => (key === 'posts' ? t('ovChartPosts') : t('ovChartComments'))
 
   return (
@@ -112,11 +139,7 @@ const Overview = () => {
       <div className="dash-grid-2">
         <DashCard
           title={t('ovChartTitle')}
-          subtitle={
-            timelineRangeLabel
-              ? (lang === 'ar' ? `منشورات + تعليقات · ${timelineRangeLabel}` : `Posts + comments · ${timelineRangeLabel}`)
-              : t('ovChartSubEmpty')
-          }
+          subtitle={chartSubtitle || t('ovChartSubEmpty')}
           action={
             <div className="dash-chart-mode-tabs">
               <button
@@ -136,95 +159,122 @@ const Overview = () => {
             </div>
           }
         >
-          <div className="dash-chart-box" style={{ width: '100%', minHeight: 280, height: 280 }}>
-            {timelineChart.length === 0 ? (
+          <div className="dash-chart-box" style={{ width: '100%', minHeight: 300, height: 300 }}>
+            {chartData.length === 0 ? (
               <div className="dash-empty">{t('ovChartSubEmpty')}</div>
             ) : (
-            <ResponsiveContainer width="100%" height="100%" minHeight={280}>
-              <AreaChart data={timelineChart} margin={chartMargin}>
-                {chartMode === 'sentiment' ? <SentimentGradients /> : (
-                  <defs>
-                    <linearGradient id="ovPosts" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#2563eb" stopOpacity={0.4} />
-                      <stop offset="100%" stopColor="#2563eb" stopOpacity={0.03} />
-                    </linearGradient>
-                    <linearGradient id="ovComments" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#8b5cf6" stopOpacity={0.35} />
-                      <stop offset="100%" stopColor="#8b5cf6" stopOpacity={0.03} />
-                    </linearGradient>
-                  </defs>
-                )}
-                <CartesianGrid strokeDasharray="3 6" stroke="var(--border-light)" />
-                <XAxis
-                  dataKey="label"
-                  axisLine={{ stroke: 'var(--border)' }}
-                  tickLine={{ stroke: 'var(--border)' }}
-                  tick={{ fontSize: 10, fill: 'var(--text-secondary)', fontWeight: 600 }}
-                  dy={8}
-                  minTickGap={12}
-                  interval={timelineChart.length <= 12 ? 0 : 'preserveStartEnd'}
-                />
-                <YAxis
-                  orientation={isRTL ? 'right' : 'left'}
-                  axisLine={{ stroke: 'var(--border)' }}
-                  tickLine={false}
-                  tick={{ fontSize: 10, fill: 'var(--text-tertiary)' }}
-                  width={40}
-                  allowDecimals={false}
-                  domain={[0, Math.max(chartMode === 'sentiment' ? sentimentYMax : volumeYMax, 1)]}
-                />
-                <Tooltip
-                  content={({ active, payload, label }) => (
-                    <DashboardChartTooltip
-                      active={active}
-                      payload={payload}
-                      label={label}
-                      ts={ts}
-                      formatSeriesName={chartMode === 'volume' ? volumeName : undefined}
-                      showPercent={chartMode === 'sentiment'}
-                    />
+              <ResponsiveContainer width="100%" height="100%" minHeight={300}>
+                <LineChart data={chartData} margin={chartMargin}>
+                  <CartesianGrid strokeDasharray="3 6" stroke="var(--border-light)" />
+                  <XAxis
+                    dataKey="label"
+                    type="category"
+                    axisLine={{ stroke: 'var(--border)' }}
+                    tickLine={{ stroke: 'var(--border)' }}
+                    tick={{ fontSize: 10, fill: 'var(--text-secondary)', fontWeight: 600 }}
+                    dy={8}
+                    interval={tickInterval}
+                    angle={chartData.length > 8 ? -28 : 0}
+                    textAnchor={chartData.length > 8 ? 'end' : 'middle'}
+                    height={chartData.length > 8 ? 52 : 32}
+                  />
+                  <YAxis
+                    orientation={isRTL ? 'right' : 'left'}
+                    axisLine={{ stroke: 'var(--border)' }}
+                    tickLine={false}
+                    tick={{ fontSize: 10, fill: 'var(--text-tertiary)' }}
+                    width={44}
+                    allowDecimals={false}
+                    domain={[0, Math.max(chartMode === 'sentiment' ? sentimentYMax : volumeYMax, 1)]}
+                    label={{
+                      value: chartMode === 'volume'
+                        ? (lang === 'ar' ? 'العدد' : 'Count')
+                        : (lang === 'ar' ? 'تعليقات' : 'Comments'),
+                      angle: -90,
+                      position: isRTL ? 'insideRight' : 'insideLeft',
+                      style: { fontSize: 10, fill: 'var(--text-tertiary)' },
+                    }}
+                  />
+                  <Tooltip
+                    content={({ active, payload, label }) => (
+                      <DashboardChartTooltip
+                        active={active}
+                        payload={payload}
+                        label={granularity === 'week' && lang === 'ar' ? `أسبوع: ${label}` : granularity === 'week' ? `Week: ${label}` : label}
+                        ts={ts}
+                        formatSeriesName={chartMode === 'volume' ? volumeName : undefined}
+                        showPercent={chartMode === 'sentiment'}
+                      />
+                    )}
+                    cursor={{ stroke: 'var(--border)', strokeWidth: 1, strokeDasharray: '4 4' }}
+                  />
+                  <Legend
+                    verticalAlign="top"
+                    height={28}
+                    iconType="circle"
+                    iconSize={8}
+                    wrapperStyle={{ fontSize: '0.75rem' }}
+                    formatter={(value) => (chartMode === 'volume' ? volumeName(value) : chartKeyToLabel(value, ts))}
+                  />
+                  {chartMode === 'volume' ? (
+                    <>
+                      <Line
+                        type="monotone"
+                        dataKey="comments"
+                        name="comments"
+                        stroke={OV_COLORS.comments}
+                        strokeWidth={2.5}
+                        dot={lineDot(OV_COLORS.comments)}
+                        activeDot={{ r: 6, fill: OV_COLORS.comments, stroke: '#fff', strokeWidth: 2 }}
+                        animationDuration={800}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="posts"
+                        name="posts"
+                        stroke={OV_COLORS.posts}
+                        strokeWidth={2.5}
+                        dot={lineDot(OV_COLORS.posts)}
+                        activeDot={{ r: 6, fill: OV_COLORS.posts, stroke: '#fff', strokeWidth: 2 }}
+                        animationDuration={1000}
+                      />
+                    </>
+                  ) : (
+                    <>
+                      <Line
+                        type="monotone"
+                        dataKey={CHART_KEY_POS}
+                        name={CHART_KEY_POS}
+                        stroke={SENTIMENT_CHART_COLORS[CHART_KEY_POS].stroke}
+                        strokeWidth={2.5}
+                        dot={lineDot(SENTIMENT_CHART_COLORS[CHART_KEY_POS].stroke)}
+                        activeDot={{ r: 6, fill: SENTIMENT_CHART_COLORS[CHART_KEY_POS].stroke, stroke: '#fff', strokeWidth: 2 }}
+                        animationDuration={800}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey={CHART_KEY_NEU}
+                        name={CHART_KEY_NEU}
+                        stroke={SENTIMENT_CHART_COLORS[CHART_KEY_NEU].stroke}
+                        strokeWidth={2.5}
+                        dot={lineDot(SENTIMENT_CHART_COLORS[CHART_KEY_NEU].stroke)}
+                        activeDot={{ r: 6, fill: SENTIMENT_CHART_COLORS[CHART_KEY_NEU].stroke, stroke: '#fff', strokeWidth: 2 }}
+                        animationDuration={1000}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey={CHART_KEY_NEG}
+                        name={CHART_KEY_NEG}
+                        stroke={SENTIMENT_CHART_COLORS[CHART_KEY_NEG].stroke}
+                        strokeWidth={2.5}
+                        dot={lineDot(SENTIMENT_CHART_COLORS[CHART_KEY_NEG].stroke)}
+                        activeDot={{ r: 6, fill: SENTIMENT_CHART_COLORS[CHART_KEY_NEG].stroke, stroke: '#fff', strokeWidth: 2 }}
+                        animationDuration={1200}
+                      />
+                    </>
                   )}
-                />
-                <Legend
-                  verticalAlign="top"
-                  height={28}
-                  iconType="circle"
-                  iconSize={8}
-                  wrapperStyle={{ fontSize: '0.75rem' }}
-                  formatter={(value) => (chartMode === 'volume' ? volumeName(value) : chartKeyToLabel(value, ts))}
-                />
-                {chartMode === 'volume' ? (
-                  <>
-                    <Area
-                      type="monotone"
-                      dataKey="comments"
-                      name="comments"
-                      stroke="#8b5cf6"
-                      strokeWidth={2}
-                      fill="url(#ovComments)"
-                      activeDot={{ r: 5, stroke: '#fff', strokeWidth: 2 }}
-                      animationDuration={1000}
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="posts"
-                      name="posts"
-                      stroke="#2563eb"
-                      strokeWidth={2.5}
-                      fill="url(#ovPosts)"
-                      activeDot={{ r: 5, stroke: '#fff', strokeWidth: 2 }}
-                      animationDuration={1200}
-                    />
-                  </>
-                ) : (
-                  <>
-                    <Area type="monotone" dataKey={CHART_KEY_POS} stackId="sent" stroke={SENTIMENT_CHART_COLORS[CHART_KEY_POS].stroke} strokeWidth={1.5} fill="url(#gradPos)" animationDuration={900} />
-                    <Area type="monotone" dataKey={CHART_KEY_NEU} stackId="sent" stroke={SENTIMENT_CHART_COLORS[CHART_KEY_NEU].stroke} strokeWidth={1.5} fill="url(#gradNeu)" animationDuration={1100} />
-                    <Area type="monotone" dataKey={CHART_KEY_NEG} stackId="sent" stroke={SENTIMENT_CHART_COLORS[CHART_KEY_NEG].stroke} strokeWidth={1.5} fill="url(#gradNeg)" animationDuration={1300} />
-                  </>
-                )}
-              </AreaChart>
-            </ResponsiveContainer>
+                </LineChart>
+              </ResponsiveContainer>
             )}
           </div>
         </DashCard>
@@ -264,46 +314,34 @@ const Overview = () => {
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                   <span className="mono" style={{ fontSize: '.82rem', color: 'var(--text-secondary)' }}>
-                    {t_item.count.toLocaleString()} {t('ovTopicsMentions')}
+                    {t_item.count} {lang === 'ar' ? 'منشور' : 'posts'}
                   </span>
-                  <span className={`badge ${t_item.badge}`}>
-                    {lang === 'en'
-                      ? (t_item.sentiment === 'سلبي' ? 'Negative' : t_item.sentiment === 'إيجابي' ? 'Positive' : 'Neutral')
-                      : t_item.sentiment}
-                  </span>
+                  <span className={`badge ${t_item.badge}`}>{t_item.sentiment}</span>
                 </div>
               </div>
             ))}
           </div>
         </DashCard>
 
-        <DashCard title={t('ovScrapesTitle')}>
-          <div className="dash-table-wrap">
-            <table className="data-table" style={{ direction: isRTL ? 'rtl' : 'ltr' }}>
-              <thead>
-                <tr>
-                  <th>{t('ovScrapesPlatform')}</th>
-                  <th>{t('ovScrapesStatus')}</th>
-                  <th>{t('ovScrapesCount')}</th>
-                  <th>{t('ovScrapesDate')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {jobs.map((job, i) => (
-                  <tr key={i}>
-                    <td style={{ fontWeight: 700 }}>{lang === 'ar' ? 'فيسبوك' : 'Facebook'}</td>
-                    <td><span className="badge badge-green">{job.status === 'completed' ? t('ovScrapesCompleted') : job.status}</span></td>
-                    <td className="mono">{job.records_fetched}</td>
-                    <td style={{ color: 'var(--text-secondary)' }}>
-                      {job.started_at ? new Date(job.started_at).toLocaleString(lang === 'ar' ? 'ar-EG' : 'en-US') : 'N/A'}
-                    </td>
-                  </tr>
-                ))}
-                {jobs.length === 0 && (
-                  <tr><td colSpan={4} className="dash-empty">{t('ovScrapesEmpty')}</td></tr>
-                )}
-              </tbody>
-            </table>
+        <DashCard title={t('ovJobsTitle')}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {jobs.length === 0 ? (
+              <p style={{ color: 'var(--text-tertiary)', fontSize: '.9rem' }}>{t('ovNoJobs')}</p>
+            ) : (
+              jobs.map((job) => (
+                <div key={job.id} className="dash-list-item">
+                  <div>
+                    <span style={{ fontWeight: 700, fontSize: '.9rem' }}>{job.profile_name || 'Facebook'}</span>
+                    <p style={{ fontSize: '.78rem', color: 'var(--text-tertiary)', margin: '4px 0 0' }}>
+                      {job.started_at ? new Date(job.started_at).toLocaleString(chartLocale) : '—'}
+                    </p>
+                  </div>
+                  <span className={`badge ${job.status === 'completed' ? 'badge-green' : job.status === 'failed' ? 'badge-red' : 'badge-amber'}`}>
+                    {job.status}
+                  </span>
+                </div>
+              ))
+            )}
           </div>
         </DashCard>
       </div>

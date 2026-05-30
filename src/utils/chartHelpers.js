@@ -186,3 +186,74 @@ export function piePercentLabel(total) {
   return ({ name, value, percent }) =>
     percent >= 0.08 ? `${Math.round(percent * 100)}%` : ''
 }
+
+export function filterActiveTimelineRows(rows) {
+  return rows.filter((r) => {
+    const volume = (r.posts || 0) + (r.comments || 0)
+    const sentiment = (r.pos || 0) + (r.neg || 0) + (r.neu || 0)
+    return volume > 0 || sentiment > 0
+  })
+}
+
+export function aggregateTimelineByWeek(rows, locale) {
+  const buckets = new Map()
+  rows.forEach((row) => {
+    const d = new Date(row.date)
+    if (Number.isNaN(d.getTime())) return
+    const weekStart = new Date(d)
+    weekStart.setHours(0, 0, 0, 0)
+    weekStart.setDate(weekStart.getDate() - weekStart.getDay())
+    const key = dayKey(weekStart)
+    if (!buckets.has(key)) {
+      buckets.set(key, {
+        date: key,
+        weekStart: new Date(weekStart),
+        posts: 0,
+        comments: 0,
+        pos: 0,
+        neg: 0,
+        neu: 0,
+      })
+    }
+    const b = buckets.get(key)
+    b.posts += row.posts || 0
+    b.comments += row.comments || 0
+    b.pos += row.pos || 0
+    b.neg += row.neg || 0
+    b.neu += row.neu || 0
+  })
+  return Array.from(buckets.values())
+    .sort((a, b) => a.weekStart - b.weekStart)
+    .map((b) => {
+      const weekEnd = new Date(b.weekStart)
+      weekEnd.setDate(weekEnd.getDate() + 6)
+      const startLbl = formatChartDayLabel(b.weekStart, locale)
+      const endLbl = formatChartDayLabel(weekEnd, locale)
+      return {
+        date: b.date,
+        posts: b.posts,
+        comments: b.comments,
+        pos: b.pos,
+        neg: b.neg,
+        neu: b.neu,
+        label: startLbl === endLbl ? startLbl : `${startLbl} – ${endLbl}`,
+      }
+    })
+}
+
+/** Active days only; weekly buckets when many points. */
+export function prepareOverviewChartSeries(rows, locale, { weekThreshold = 24 } = {}) {
+  const active = filterActiveTimelineRows(rows)
+  if (active.length === 0) {
+    return { data: [], granularity: 'day', sourceDays: 0 }
+  }
+  const withLabels = active.map((row) => ({
+    ...row,
+    label: row.label || formatChartDayLabel(row.date, locale),
+  }))
+  if (withLabels.length > weekThreshold) {
+    const weekly = aggregateTimelineByWeek(withLabels, locale)
+    return { data: weekly, granularity: 'week', sourceDays: withLabels.length }
+  }
+  return { data: withLabels, granularity: 'day', sourceDays: withLabels.length }
+}
