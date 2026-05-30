@@ -327,10 +327,10 @@ export const translations = {
     plSyncing: "جاري الإرسال...",
 
     // Reports
-    repSubtitle: "أنشئ تقارير مفصّلة وتحليلات متقدمة وصدّرها مباشرة بصيغة Excel (XLSX)",
+    repSubtitle: "أنشئ تقارير مفصّلة وصدّرها بصيغة Excel + PDF (نظرة عامة + تحليل المشاعر)",
     repGenerateNew: "إنشاء تقرير جديد",
-    repModalTitle: "إنشاء تقرير Excel جديد",
-    repModalDesc: "اختر نوع التقرير والفترة الزمنية وسيقوم النظام بتصدير البيانات فوراً بصيغة Excel المتوافقة بالكامل مع جداول البيانات.",
+    repModalTitle: "إنشاء تقرير جديد",
+    repModalDesc: "اختر نوع التقرير والفترة الزمنية. ستحصل على ملف Excel للبيانات التفصيلية + ملف PDF يلخّص نظرة عامة وتحليل المشاعر.",
     repTypeLabel: "نوع التقرير",
     repType1: "تحليل عام للمشاعر والمواضيع",
     repType2: "تحليل المشاعر المفصل",
@@ -344,8 +344,10 @@ export const translations = {
     repTableStatus: "الحالة",
     repTableFormat: "الصيغة",
     repTableAction: "الإجراء",
-    repEmpty: "لا توجد تقارير سابقة. اضغط على الزر أعلاه لإنشاء أول تقرير Excel.",
-    repDownload: "تحميل Excel",
+    repEmpty: "لا توجد تقارير سابقة. اضغط على الزر أعلاه لإنشاء أول تقرير.",
+    repDownloadAll: "تحميل الكل",
+    repDownload: "Excel",
+    repDownloadPdf: "PDF",
     repGenerating: "جاري إنشاء التقرير...",
 
     dateUnknown: "غير محدد",
@@ -803,10 +805,10 @@ export const translations = {
     plSyncing: "Submitting...",
 
     // Reports
-    repSubtitle: "Generate detailed reports and advanced analytics and export them directly in Excel (XLSX) format",
+    repSubtitle: "Generate detailed reports and export as Excel + PDF (Overview + Sentiment Analysis)",
     repGenerateNew: "Generate New Report",
-    repModalTitle: "Generate New Excel Report",
-    repModalDesc: "Choose the report type and date range, and the system will immediately export the data in fully compatible Excel spreadsheet format.",
+    repModalTitle: "Generate New Report",
+    repModalDesc: "Choose the report type and date range. You will get an Excel file with detailed rows plus a PDF summarizing Overview and Sentiment Analysis.",
     repTypeLabel: "Report Type",
     repType1: "General Sentiment & Topic Analysis",
     repType2: "Detailed Sentiment Analysis",
@@ -820,8 +822,10 @@ export const translations = {
     repTableStatus: "Status",
     repTableFormat: "Format",
     repTableAction: "Action",
-    repEmpty: "No previous reports found. Click the button above to generate your first Excel report.",
-    repDownload: "Download Excel",
+    repEmpty: "No previous reports found. Click the button above to generate your first report.",
+    repDownloadAll: "Download all",
+    repDownload: "Excel",
+    repDownloadPdf: "PDF",
     repGenerating: "Generating report...",
 
     dateUnknown: "N/A",

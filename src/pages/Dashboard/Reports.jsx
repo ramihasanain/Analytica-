@@ -31,7 +31,7 @@ const Reports = () => {
               r.type === 'Topic' ? t('repType3') : r.type,
         period: `${r.period_from || '—'} - ${r.period_to || '—'}`,
         status: lang === 'ar' ? 'جاهز' : 'Completed',
-        format: 'Excel (XLSX)',
+        format: lang === 'ar' ? 'Excel + PDF' : 'Excel + PDF',
         badge: 'badge-green',
         file_url: r.file_url
       }))
@@ -57,7 +57,7 @@ const Reports = () => {
         period_from: periodFrom || null,
         period_to: periodTo || null,
         status: lang === 'ar' ? 'جاهز' : 'Completed',
-        format: 'Excel'
+        format: 'Excel + PDF'
       })
       alert(lang === 'ar' ? 'تم إنشاء التقرير بنجاح!' : 'Report generated successfully!')
       setShowModal(false)
@@ -74,20 +74,40 @@ const Reports = () => {
     }
   }
 
-  const handleDownload = async (id, title) => {
+  const downloadBlob = (blob, filename) => {
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.setAttribute('download', filename)
+    document.body.appendChild(link)
+    link.click()
+    link.parentNode.removeChild(link)
+    window.URL.revokeObjectURL(url)
+  }
+
+  const handleDownloadCsv = async (id, title) => {
     try {
       const res = await api.get(`/reports/${id}/download/`, { responseType: 'blob' })
-      const url = window.URL.createObjectURL(new Blob([res.data]))
-      const link = document.createElement('a')
-      link.href = url
-      link.setAttribute('download', `${title}.csv`)
-      document.body.appendChild(link)
-      link.click()
-      link.parentNode.removeChild(link)
+      downloadBlob(new Blob([res.data]), `${title}.csv`)
     } catch (err) {
-      console.error('Error downloading report', err)
-      alert(lang === 'ar' ? 'فشل تحميل التقرير' : 'Failed to download report')
+      console.error('Error downloading CSV report', err)
+      alert(lang === 'ar' ? 'فشل تحميل ملف Excel' : 'Failed to download Excel file')
     }
+  }
+
+  const handleDownloadPdf = async (id, title) => {
+    try {
+      const res = await api.get(`/reports/${id}/download-pdf/?lang=${lang}`, { responseType: 'blob' })
+      downloadBlob(new Blob([res.data], { type: 'application/pdf' }), `${title}.pdf`)
+    } catch (err) {
+      console.error('Error downloading PDF report', err)
+      alert(lang === 'ar' ? 'فشل تحميل ملف PDF' : 'Failed to download PDF file')
+    }
+  }
+
+  const handleDownloadAll = async (id, title) => {
+    await handleDownloadCsv(id, title)
+    await handleDownloadPdf(id, title)
   }
 
   return (
@@ -126,10 +146,18 @@ const Reports = () => {
                 <td><span className={`badge ${r.badge}`}>{r.status}</span></td>
                 <td className="mono" style={{ fontWeight: 700, color: 'var(--green)' }}>{r.format}</td>
                 <td>
-                  <button className="btn btn-ghost" style={{ fontSize: '.85rem', display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--blue)' }} onClick={() => handleDownload(r.id, r.title)}>
-                    <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>
-                    {t('repDownload')}
-                  </button>
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+                    <button type="button" className="btn btn-ghost" style={{ fontSize: '.82rem', display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--blue)' }} onClick={() => handleDownloadAll(r.id, r.title)}>
+                      <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>
+                      {t('repDownloadAll')}
+                    </button>
+                    <button type="button" className="btn btn-ghost" style={{ fontSize: '.78rem', color: 'var(--text-secondary)' }} onClick={() => handleDownloadCsv(r.id, r.title)}>
+                      {t('repDownload')}
+                    </button>
+                    <button type="button" className="btn btn-ghost" style={{ fontSize: '.78rem', color: 'var(--text-secondary)' }} onClick={() => handleDownloadPdf(r.id, r.title)}>
+                      {t('repDownloadPdf')}
+                    </button>
+                  </div>
                 </td>
               </tr>
             )) : (
