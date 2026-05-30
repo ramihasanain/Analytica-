@@ -3,13 +3,13 @@ import api from '../../services/api'
 import { useLanguage } from '../../LanguageContext'
 import { SENTIMENT_POSITIVE, SENTIMENT_NEGATIVE, SENTIMENT_NEUTRAL, TOPIC_UNSPECIFIED, isGeminiEngine } from '../../utils/i18nHelpers'
 import {
-  buildDataBoundedDailySeries,
+  buildActiveDailySeries,
   emptySentimentCounts,
   sentimentLabelToChartKey,
-  formatChartDayLabel,
   niceAxisMax,
   maxSeriesPeak,
   toPercentStack,
+  prepareSentimentTimelineSeries,
   CHART_KEY_POS,
   CHART_KEY_NEG,
   CHART_KEY_NEU,
@@ -184,8 +184,8 @@ const SentimentAnalytics = () => {
     { name: CHART_KEY_NEU, value: metrics.commentNeutral, color: COLORS.neu },
   ].filter(item => item.value > 0), [metrics])
 
-  const timelineData = useMemo(() => {
-    const rows = buildDataBoundedDailySeries({
+  const { data: timelineData, granularity: timelineGranularity, sourceDays: timelineSourceDays } = useMemo(() => {
+    const rows = buildActiveDailySeries({
       items: filteredComments,
       getDate: (item) => item.raw_date,
       seedRow: emptySentimentCounts,
@@ -195,21 +195,33 @@ const SentimentAnalytics = () => {
         row.total += 1
       },
     })
-    return rows.map((r) => ({
-      ...r,
-      date: formatChartDayLabel(r.rawDate, chartLocale),
-    }))
+    return prepareSentimentTimelineSeries(rows, chartLocale)
   }, [filteredComments, chartLocale])
 
   const timelineRangeLabel = useMemo(() => {
-    if (timelineData.length === 0) return ''
-    const first = formatChartDayLabel(timelineData[0].rawDate, chartLocale)
-    const last = formatChartDayLabel(timelineData[timelineData.length - 1].rawDate, chartLocale)
+    const activePoints = timelineData.filter((row) => !row.isGap)
+    if (activePoints.length === 0) return ''
+    const first = activePoints[0].label
+    const last = activePoints[activePoints.length - 1].label
     if (first === last) return first
     return lang === 'ar' ? `من ${first} إلى ${last}` : `${first} – ${last}`
-  }, [timelineData, chartLocale, lang])
+  }, [timelineData, lang])
+
+  const timelineSubtitle = useMemo(() => {
+    if (!timelineData.length) return lang === 'ar' ? 'لا توجد تعليقات في الفترة' : 'No comments in this period'
+    const range = timelineRangeLabel
+    if (timelineGranularity === 'week') {
+      return lang === 'ar'
+        ? `${metrics.commentTotal} تعليق · ${timelineSourceDays} يوم نشاط · ${timelineData.length} أسابيع · ${range}`
+        : `${metrics.commentTotal} comments · ${timelineSourceDays} active days · ${timelineData.length} weeks · ${range}`
+    }
+    return lang === 'ar'
+      ? `${metrics.commentTotal} تعليق · ${timelineSourceDays} ${timelineSourceDays === 1 ? 'يوم' : 'أيام'} بها بيانات · ${range}`
+      : `${metrics.commentTotal} comments · ${timelineSourceDays} active ${timelineSourceDays === 1 ? 'day' : 'days'} · ${range}`
+  }, [timelineData.length, timelineGranularity, timelineSourceDays, timelineRangeLabel, metrics.commentTotal, lang])
 
   const timelineYMax = useMemo(() => niceAxisMax(maxSeriesPeak(timelineData)), [timelineData])
+  const timelineTickInterval = timelineData.length <= 8 ? 0 : Math.ceil(timelineData.length / 7) - 1
 
   const timelineLineDot = (color) => ({
     r: 4,
@@ -407,13 +419,7 @@ const SentimentAnalytics = () => {
         <ChartPanel
           className="sent-chart-wide"
           title={`📈 ${t('sentChartTimeline')}`}
-          subtitle={
-            timelineRangeLabel
-              ? (lang === 'ar'
-                ? `${metrics.commentTotal} تعليق · ${timelineRangeLabel}`
-                : `${metrics.commentTotal} comments · ${timelineRangeLabel}`)
-              : (lang === 'ar' ? 'لا توجد تعليقات في الفترة' : 'No comments in this period')
-          }
+          subtitle={timelineSubtitle}
           action={
             <div className="sent-legend-inline">
               {[SENTIMENT_POSITIVE, SENTIMENT_NEGATIVE, SENTIMENT_NEUTRAL].map((s, i) => (
@@ -433,13 +439,16 @@ const SentimentAnalytics = () => {
                 <LineChart data={timelineData} margin={chartMargin}>
                   <CartesianGrid strokeDasharray="3 6" stroke="var(--border-light)" />
                   <XAxis
-                    dataKey="date"
+                    dataKey="label"
+                    type="category"
                     axisLine={{ stroke: 'var(--border)' }}
                     tickLine={{ stroke: 'var(--border)' }}
                     tick={{ fontSize: 11, fill: 'var(--text-secondary)', fontWeight: 600 }}
                     dy={8}
-                    minTickGap={12}
-                    interval={timelineData.length <= 12 ? 0 : 'preserveStartEnd'}
+                    interval={timelineTickInterval}
+                    angle={timelineData.length > 8 ? -28 : 0}
+                    textAnchor={timelineData.length > 8 ? 'end' : 'middle'}
+                    height={timelineData.length > 8 ? 52 : 32}
                   />
                   <YAxis
                     orientation={yOrient}
@@ -457,9 +466,24 @@ const SentimentAnalytics = () => {
                     }}
                   />
                   <Tooltip
-                    content={({ active, payload, label }) => (
-                      <DashboardChartTooltip active={active} payload={payload} label={label} ts={ts} showPercent />
-                    )}
+                    content={({ active, payload, label }) => {
+                      if (payload?.[0]?.payload?.isGap) return null
+                      return (
+                        <DashboardChartTooltip
+                          active={active}
+                          payload={payload}
+                          label={
+                            timelineGranularity === 'week' && lang === 'ar'
+                              ? `أسبوع: ${label}`
+                              : timelineGranularity === 'week'
+                                ? `Week: ${label}`
+                                : label
+                          }
+                          ts={ts}
+                          showPercent
+                        />
+                      )
+                    }}
                     cursor={{ stroke: 'var(--border)', strokeWidth: 1, strokeDasharray: '4 4' }}
                   />
                   <Line
@@ -470,6 +494,7 @@ const SentimentAnalytics = () => {
                     strokeWidth={2.5}
                     dot={timelineLineDot(COLORS.pos)}
                     activeDot={{ r: 6, fill: COLORS.pos, stroke: '#fff', strokeWidth: 2 }}
+                    connectNulls={false}
                     animationDuration={800}
                   />
                   <Line
@@ -480,6 +505,7 @@ const SentimentAnalytics = () => {
                     strokeWidth={2.5}
                     dot={timelineLineDot(COLORS.neu)}
                     activeDot={{ r: 6, fill: COLORS.neu, stroke: '#fff', strokeWidth: 2 }}
+                    connectNulls={false}
                     animationDuration={1000}
                   />
                   <Line
@@ -490,6 +516,7 @@ const SentimentAnalytics = () => {
                     strokeWidth={2.5}
                     dot={timelineLineDot(COLORS.neg)}
                     activeDot={{ r: 6, fill: COLORS.neg, stroke: '#fff', strokeWidth: 2 }}
+                    connectNulls={false}
                     animationDuration={1200}
                   />
                 </LineChart>

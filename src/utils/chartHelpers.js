@@ -115,6 +115,33 @@ export function buildContinuousDailySeries({
   return Array.from(buckets.values()).sort((a, b) => a.rawDate - b.rawDate)
 }
 
+/** Daily buckets only on dates that have at least one item. */
+export function buildActiveDailySeries({
+  items = [],
+  getDate,
+  applyItem,
+  seedRow = emptySentimentCounts,
+}) {
+  if (!items?.length) return []
+
+  const buckets = new Map()
+  items.forEach((item) => {
+    const raw = getDate(item)
+    if (!raw) return
+    const d = new Date(raw)
+    if (Number.isNaN(d.getTime())) return
+    const key = dayKey(d)
+    if (!buckets.has(key)) {
+      const dayStart = new Date(d)
+      dayStart.setHours(0, 0, 0, 0)
+      buckets.set(key, { dateKey: key, rawDate: dayStart, ...seedRow() })
+    }
+    applyItem(buckets.get(key), item)
+  })
+
+  return Array.from(buckets.values()).sort((a, b) => a.rawDate - b.rawDate)
+}
+
 /** Daily series from first to last item date only (no padding to today or filter window). */
 export function buildDataBoundedDailySeries({
   items = [],
@@ -200,7 +227,7 @@ export function filterActiveTimelineRows(rows) {
 export function aggregateTimelineByWeek(rows, locale) {
   const buckets = new Map()
   rows.forEach((row) => {
-    const d = new Date(row.date)
+    const d = row.rawDate instanceof Date ? row.rawDate : new Date(row.dateKey || row.date)
     if (Number.isNaN(d.getTime())) return
     const weekStart = new Date(d)
     weekStart.setHours(0, 0, 0, 0)
@@ -251,11 +278,54 @@ export function prepareOverviewChartSeries(rows, locale, { weekThreshold = 24 } 
   }
   const withLabels = active.map((row) => ({
     ...row,
-    label: row.label || formatChartDayLabel(row.date, locale),
+    label: row.label || formatChartDayLabel(row.rawDate || row.date, locale),
   }))
   if (withLabels.length > weekThreshold) {
     const weekly = aggregateTimelineByWeek(withLabels, locale)
     return { data: weekly, granularity: 'week', sourceDays: withLabels.length }
   }
   return { data: withLabels, granularity: 'day', sourceDays: withLabels.length }
+}
+
+const TIMELINE_GAP_BREAK_DAYS = 14
+
+/** Sentiment timeline: active days only, weekly roll-up, line breaks across long gaps. */
+export function prepareSentimentTimelineSeries(rows, locale, { weekThreshold = 24 } = {}) {
+  if (!rows?.length) return { data: [], granularity: 'day', sourceDays: 0 }
+
+  const normalized = rows.map((row) => ({
+    ...row,
+    date: row.dateKey || row.date,
+  }))
+  const active = filterActiveTimelineRows(normalized)
+  if (!active.length) return { data: [], granularity: 'day', sourceDays: 0 }
+
+  if (active.length > weekThreshold) {
+    return prepareOverviewChartSeries(active, locale, { weekThreshold })
+  }
+
+  const data = []
+  active.forEach((row, i) => {
+    if (i > 0) {
+      const prev = active[i - 1]
+      const gapDays = (new Date(row.date).getTime() - new Date(prev.date).getTime()) / 86400000
+      if (gapDays > TIMELINE_GAP_BREAK_DAYS) {
+        data.push({
+          dateKey: `gap-${i}`,
+          label: '…',
+          pos: null,
+          neg: null,
+          neu: null,
+          total: null,
+          isGap: true,
+        })
+      }
+    }
+    data.push({
+      ...row,
+      label: row.label || formatChartDayLabel(row.rawDate || row.date, locale),
+    })
+  })
+
+  return { data, granularity: 'day', sourceDays: active.length }
 }
