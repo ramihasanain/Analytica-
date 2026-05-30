@@ -10,14 +10,15 @@ import {
   niceAxisMax,
   maxStackTotal,
   toPercentStack,
+  resolveTimelineDays,
   CHART_KEY_POS,
   CHART_KEY_NEG,
   CHART_KEY_NEU,
 } from '../../utils/chartHelpers'
 import { DashboardChartTooltip, SentimentGradients, chartKeyToLabel } from '../../components/dashboard/DashboardCharts'
 import {
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, BarChart, Bar, Legend, Label
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  PieChart, Pie, Cell, Legend, Label
 } from 'recharts'
 
 const COLORS = {
@@ -118,8 +119,6 @@ const SentimentAnalytics = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const timelineDays = timeRange === '7d' ? 7 : timeRange === '30d' ? 30 : 14
-
   const postById = useMemo(() => {
     const map = {}
     allData.forEach(item => {
@@ -156,6 +155,11 @@ const SentimentAnalytics = () => {
   }), [allData, postById, selectedProfile, selectedTopic, selectedType, selectedSentiment, searchQuery, timeRange])
 
   const filteredComments = useMemo(() => filteredData.filter(i => i.type === 'comment'), [filteredData])
+
+  const timelineDays = useMemo(
+    () => resolveTimelineDays(timeRange, filteredComments, (item) => item.raw_date),
+    [timeRange, filteredComments]
+  )
 
   const metrics = useMemo(() => {
     const commentTotal = filteredComments.length
@@ -226,11 +230,11 @@ const SentimentAnalytics = () => {
     })
 
     return toPercentStack(
-      Object.values(groups)
-        .sort((a, b) => b.total - a.total)
-        .slice(0, 5)
+      Object.values(groups).sort((a, b) => b.total - a.total)
     )
   }, [filteredComments, topicLabel, postById])
+
+  const topicChartHeight = Math.max(300, topicChartData.length * 56)
 
   const sentimentPills = [
     { key: 'all', label: t('filterAll'), color: COLORS.blue },
@@ -412,8 +416,7 @@ const SentimentAnalytics = () => {
               <div className="sent-empty">{t('sentChartTimelineEmpty')}</div>
             ) : (
               <ResponsiveContainer width="100%" height="100%" minHeight={320}>
-                <AreaChart data={timelineData} margin={chartMargin}>
-                  <SentimentGradients />
+                <BarChart data={timelineData} margin={chartMargin}>
                   <CartesianGrid strokeDasharray="4 8" vertical={false} stroke="var(--border-light)" />
                   <XAxis
                     dataKey="date"
@@ -431,18 +434,18 @@ const SentimentAnalytics = () => {
                     tick={{ fontSize: 11, fill: 'var(--text-tertiary)' }}
                     width={40}
                     allowDecimals={false}
-                    domain={[0, timelineYMax]}
+                    domain={[0, Math.max(timelineYMax, 1)]}
                   />
                   <Tooltip
                     content={({ active, payload, label }) => (
                       <DashboardChartTooltip active={active} payload={payload} label={label} ts={ts} showPercent />
                     )}
-                    cursor={{ stroke: 'var(--border)', strokeWidth: 1, strokeDasharray: '4 4' }}
+                    cursor={{ fill: 'rgba(37, 99, 235, 0.06)' }}
                   />
-                  <Area type="monotone" dataKey={CHART_KEY_POS} stackId="sent" stroke={COLORS.pos} strokeWidth={1.5} fill="url(#gradPos)" animationDuration={900} />
-                  <Area type="monotone" dataKey={CHART_KEY_NEU} stackId="sent" stroke={COLORS.neu} strokeWidth={1.5} fill="url(#gradNeu)" animationDuration={1100} />
-                  <Area type="monotone" dataKey={CHART_KEY_NEG} stackId="sent" stroke={COLORS.neg} strokeWidth={1.5} fill="url(#gradNeg)" animationDuration={1300} />
-                </AreaChart>
+                  <Bar dataKey={CHART_KEY_POS} stackId="sent" fill={COLORS.pos} radius={[0, 0, 0, 0]} animationDuration={900} />
+                  <Bar dataKey={CHART_KEY_NEU} stackId="sent" fill={COLORS.neu} animationDuration={1100} />
+                  <Bar dataKey={CHART_KEY_NEG} stackId="sent" fill={COLORS.neg} radius={[4, 4, 0, 0]} animationDuration={1300} />
+                </BarChart>
               </ResponsiveContainer>
             )}
           </div>
@@ -525,11 +528,11 @@ const SentimentAnalytics = () => {
           title={`📊 ${t('sentChartByPost')}`}
           subtitle={t('sentChartByPostSub')}
         >
-          <div className="sent-chart-h">
+          <div className="sent-chart-h sent-chart-h--topics" style={{ minHeight: topicChartHeight }}>
             {topicChartData.length === 0 ? (
               <div className="sent-empty">{t('sentChartByPostEmpty')}</div>
             ) : (
-              <ResponsiveContainer width="100%" height="100%" minHeight={300}>
+              <ResponsiveContainer width="100%" height="100%" minHeight={topicChartHeight}>
                 <BarChart data={topicChartData} layout="vertical" margin={{ top: 8, right: isRTL ? 8 : 24, left: isRTL ? 24 : 8, bottom: 4 }} barCategoryGap="22%">
                   <SentimentGradients />
                   <CartesianGrid strokeDasharray="4 8" horizontal={false} stroke="var(--border-light)" />

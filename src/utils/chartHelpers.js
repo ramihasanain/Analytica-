@@ -37,10 +37,29 @@ export function formatChartDayLabel(dateInput, locale) {
   return d.toLocaleString(locale, { month: 'short', day: 'numeric' })
 }
 
-function dayKey(dateInput) {
-  const d = dateInput instanceof Date ? dateInput : new Date(dateInput)
-  d.setHours(0, 0, 0, 0)
-  return d.toISOString().slice(0, 10)
+/** Local calendar day (avoid UTC shift from toISOString). */
+export function dayKey(dateInput) {
+  const d = dateInput instanceof Date ? new Date(dateInput) : new Date(dateInput)
+  if (Number.isNaN(d.getTime())) return ''
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+/** Span of days to chart from comment dates. */
+export function resolveTimelineDays(timeRange, items, getDate) {
+  if (timeRange === '7d') return 7
+  if (timeRange === '30d') return 30
+  if (!items?.length) return 14
+
+  const times = items.map(getDate).filter(Boolean).map((d) => new Date(d).getTime()).filter((t) => !Number.isNaN(t))
+  if (!times.length) return 14
+
+  const min = Math.min(...times)
+  const max = Math.max(...times)
+  const spanDays = Math.ceil((max - min) / 86400000) + 1
+  return Math.min(Math.max(spanDays, 7), 90)
 }
 
 /**
@@ -56,13 +75,33 @@ export function buildContinuousDailySeries({
 }) {
   const end = new Date(endDate)
   end.setHours(0, 0, 0, 0)
-  const buckets = new Map()
 
-  for (let i = days - 1; i >= 0; i--) {
-    const d = new Date(end)
-    d.setDate(d.getDate() - i)
-    const key = dayKey(d)
-    buckets.set(key, { dateKey: key, rawDate: new Date(d), ...seedRow() })
+  let rangeEnd = end
+  let rangeStart = new Date(end)
+  rangeStart.setDate(rangeStart.getDate() - (days - 1))
+
+  if (items.length > 0) {
+    const times = items.map(getDate).filter(Boolean).map((d) => new Date(d)).filter((d) => !Number.isNaN(d.getTime()))
+    if (times.length) {
+      const dataMax = new Date(Math.max(...times.map((d) => d.getTime())))
+      const dataMin = new Date(Math.min(...times.map((d) => d.getTime())))
+      dataMax.setHours(0, 0, 0, 0)
+      dataMin.setHours(0, 0, 0, 0)
+      if (dataMin < rangeStart) rangeStart = dataMin
+      if (dataMax > rangeEnd) rangeEnd = dataMax
+    }
+  }
+
+  const buckets = new Map()
+  const cursor = new Date(rangeStart)
+  cursor.setHours(0, 0, 0, 0)
+  const last = new Date(rangeEnd)
+  last.setHours(0, 0, 0, 0)
+
+  while (cursor <= last) {
+    const key = dayKey(cursor)
+    buckets.set(key, { dateKey: key, rawDate: new Date(cursor), ...seedRow() })
+    cursor.setDate(cursor.getDate() + 1)
   }
 
   items.forEach((item) => {
