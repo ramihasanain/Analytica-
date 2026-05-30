@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import api from '../../services/api'
 import { useLanguage } from '../../LanguageContext'
-import { SENTIMENT_POSITIVE, SENTIMENT_NEGATIVE, SENTIMENT_NEUTRAL, isGeminiEngine } from '../../utils/i18nHelpers'
+import { SENTIMENT_POSITIVE, SENTIMENT_NEGATIVE, SENTIMENT_NEUTRAL, TOPIC_UNSPECIFIED, isGeminiEngine } from '../../utils/i18nHelpers'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, BarChart, Bar, Legend, LabelList
@@ -17,12 +17,6 @@ const COLORS = {
   blue: '#2563eb',
   indigo: '#6366f1',
   violet: '#8b5cf6',
-}
-
-const truncateLabel = (text, max = 40) => {
-  if (!text) return ''
-  const cleaned = text.replace(/\s+/g, ' ').trim()
-  return cleaned.length > max ? `${cleaned.slice(0, max)}…` : cleaned
 }
 
 const ChartTooltip = ({ active, payload, label, ts }) => {
@@ -111,7 +105,7 @@ const SentimentAnalytics = () => {
             score: p.score || 0.5,
             type: p.media_type || 'post',
             parent_post: p.parent_post ?? null,
-            topic: p.topic || 'غير محدد',
+            topic: p.topic || TOPIC_UNSPECIFIED,
             engine_used: p.engine_used || 'Local Lexicon',
             is_analyzed: p.is_analyzed || false
           }
@@ -132,9 +126,29 @@ const SentimentAnalytics = () => {
   const formatChartDay = (rawDate) =>
     rawDate.toLocaleString(chartLocale, { month: 'short', day: 'numeric' })
 
+  const postById = useMemo(() => {
+    const map = {}
+    allData.forEach(item => {
+      if (item.type === 'post') map[item.id] = item
+    })
+    return map
+  }, [allData])
+
+  const getPostTopic = (item) => {
+    if (item.type === 'post') {
+      const t = item.topic?.trim()
+      return t || TOPIC_UNSPECIFIED
+    }
+    if (item.parent_post && postById[item.parent_post]) {
+      const t = postById[item.parent_post].topic?.trim()
+      return t || TOPIC_UNSPECIFIED
+    }
+    return TOPIC_UNSPECIFIED
+  }
+
   const filteredData = useMemo(() => allData.filter(item => {
     if (selectedProfile !== 'all' && item.profile_id !== parseInt(selectedProfile)) return false
-    if (selectedTopic !== 'الكل' && item.topic !== selectedTopic) return false
+    if (selectedTopic !== 'الكل' && getPostTopic(item) !== selectedTopic) return false
     if (selectedType !== 'all' && item.type !== selectedType) return false
     if (selectedSentiment !== 'all' && item.sentiment !== selectedSentiment) return false
     if (searchQuery.trim() && !item.content.toLowerCase().includes(searchQuery.toLowerCase())) return false
@@ -145,7 +159,7 @@ const SentimentAnalytics = () => {
       if (timeRange === '30d' && diffDays > 30) return false
     }
     return true
-  }), [allData, selectedProfile, selectedTopic, selectedType, selectedSentiment, searchQuery, timeRange])
+  }), [allData, postById, selectedProfile, selectedTopic, selectedType, selectedSentiment, searchQuery, timeRange])
 
   const filteredComments = useMemo(() => filteredData.filter(i => i.type === 'comment'), [filteredData])
 
@@ -190,28 +204,28 @@ const SentimentAnalytics = () => {
     return Object.values(groups).sort((a, b) => a.raw_date - b.raw_date).slice(-15)
   }, [filteredComments, chartLocale])
 
-  const postChartData = useMemo(() => {
-    const postById = {}
-    allData.forEach(item => { if (item.type === 'post') postById[item.id] = item })
+  const topicChartData = useMemo(() => {
     const groups = {}
     filteredComments.forEach(item => {
-      const pid = item.parent_post
-      if (!pid) return
-      if (!groups[pid]) {
-        const parent = postById[pid]
-        groups[pid] = {
-          postLabel: parent ? truncateLabel(parent.content) : t('sentPostFallback', { id: pid }),
+      const topicKey = getPostTopic(item)
+      if (!groups[topicKey]) {
+        groups[topicKey] = {
+          topicKey,
+          topicLabel: topicLabel(topicKey),
           [SENTIMENT_POSITIVE]: 0,
           [SENTIMENT_NEGATIVE]: 0,
           [SENTIMENT_NEUTRAL]: 0,
           total: 0
         }
       }
-      if (groups[pid][item.sentiment] !== undefined) groups[pid][item.sentiment]++
-      groups[pid].total++
+      if (groups[topicKey][item.sentiment] !== undefined) groups[topicKey][item.sentiment]++
+      groups[topicKey].total++
     })
-    return Object.values(groups).sort((a, b) => b.total - a.total).slice(0, 5)
-  }, [filteredComments, allData, t])
+
+    return Object.values(groups)
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 5)
+  }, [filteredComments, topicLabel, postById])
 
   const sentimentPills = [
     { key: 'all', label: t('filterAll'), color: COLORS.blue },
@@ -471,14 +485,14 @@ const SentimentAnalytics = () => {
       <div className="sent-charts-row sent-charts-row--split">
         <ChartPanel
           title={`📊 ${t('sentChartByPost')}`}
-          subtitle={lang === 'ar' ? 'أعلى 5 منشورات حسب عدد التعليقات' : 'Top 5 posts by comment volume'}
+          subtitle={t('sentChartByPostSub')}
         >
           <div className="sent-chart-h">
-            {postChartData.length === 0 ? (
+            {topicChartData.length === 0 ? (
               <div className="sent-empty">{t('sentChartByPostEmpty')}</div>
             ) : (
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={postChartData} layout="vertical" margin={{ top: 4, right: 12, left: 4, bottom: 4 }} barCategoryGap="18%">
+                <BarChart data={topicChartData} layout="vertical" margin={{ top: 4, right: 28, left: 4, bottom: 4 }} barCategoryGap="20%">
                   <defs>
                     <linearGradient id="barPos" x1="0" y1="0" x2="1" y2="0">
                       <stop offset="0%" stopColor={COLORS.pos} /><stop offset="100%" stopColor={COLORS.posLight} />
@@ -493,14 +507,19 @@ const SentimentAnalytics = () => {
                   <CartesianGrid strokeDasharray="4 8" horizontal={false} stroke="var(--border-light)" />
                   <XAxis type="number" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: 'var(--text-tertiary)' }} />
                   <YAxis
-                    dataKey="postLabel"
+                    dataKey="topicLabel"
                     type="category"
-                    width={isRTL ? 130 : 140}
+                    width={isRTL ? 155 : 165}
                     axisLine={false}
                     tickLine={false}
                     tick={{ fontSize: 10, fill: 'var(--text-primary)', fontWeight: 600 }}
                   />
-                  <Tooltip content={<ChartTooltip ts={ts} />} cursor={{ fill: 'rgba(37, 99, 235, 0.06)' }} />
+                  <Tooltip
+                    content={({ active, payload, label }) => (
+                      <ChartTooltip active={active} payload={payload} label={label} ts={ts} />
+                    )}
+                    cursor={{ fill: 'rgba(37, 99, 235, 0.06)' }}
+                  />
                   <Legend
                     verticalAlign="top"
                     align={isRTL ? 'left' : 'right'}
@@ -545,9 +564,7 @@ const SentimentAnalytics = () => {
                         <span className="sent-tag sent-tag--type">
                           {item.type === 'post' ? `📄 ${t('sentExplorerPost')}` : `💬 ${t('sentExplorerComment')}`}
                         </span>
-                        {item.type === 'post' && item.topic && (
-                          <span className="sent-tag sent-tag--topic">📌 {topicLabel(item.topic)}</span>
-                        )}
+                        <span className="sent-tag sent-tag--topic">📌 {topicLabel(getPostTopic(item))}</span>
                         <span className="sent-tag sent-tag--engine">
                           {isGeminiEngine(item.engine_used) ? `✨ ${t('sentExplorerAiUsed')}` : `⚡ ${t('sentExplorerLocalEngine')}`}
                         </span>

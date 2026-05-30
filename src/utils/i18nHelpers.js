@@ -3,6 +3,7 @@ export const SENTIMENT_POSITIVE = 'إيجابي'
 export const SENTIMENT_NEGATIVE = 'سلبي'
 export const SENTIMENT_NEUTRAL = 'محايد'
 export const ALL_TOPICS_KEY = 'الكل'
+export const TOPIC_UNSPECIFIED = 'غير محدد'
 
 const SENTIMENT_EN = {
   [SENTIMENT_POSITIVE]: 'Positive',
@@ -19,6 +20,9 @@ export function translateSentiment(lang, sentiment) {
 export function topicFilterLabel(lang, topic) {
   if (topic === ALL_TOPICS_KEY) {
     return lang === 'ar' ? 'كل المواضيع' : 'All topics'
+  }
+  if (!topic || topic === TOPIC_UNSPECIFIED) {
+    return lang === 'ar' ? TOPIC_UNSPECIFIED : 'Unspecified'
   }
   return topic
 }
