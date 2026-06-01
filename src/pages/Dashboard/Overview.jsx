@@ -10,6 +10,7 @@ import {
   prepareEngagementChartSeries,
 } from '../../utils/chartHelpers'
 import { DashboardChartTooltip, SENTIMENT_CHART_COLORS, chartKeyToLabel } from '../../components/dashboard/DashboardCharts'
+import { ProfileAvatar } from '../../components/dashboard/ProfileAvatar'
 
 const OV_COLORS = { posts: '#2563eb', comments: '#8b5cf6' }
 const ENG_COLORS = {
@@ -480,21 +481,24 @@ const Overview = () => {
           </div>
         </DashCard>
 
-        <DashCard title={t('ovJobsTitle')}>
+        <DashCard title={t('ovScrapesTitle')}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {jobs.length === 0 ? (
-              <p style={{ color: 'var(--text-tertiary)', fontSize: '.9rem' }}>{t('ovNoJobs')}</p>
+              <p style={{ color: 'var(--text-tertiary)', fontSize: '.9rem' }}>{t('ovScrapesEmpty')}</p>
             ) : (
               jobs.map((job) => (
                 <div key={job.id} className="dash-list-item">
-                  <div>
-                    <span style={{ fontWeight: 700, fontSize: '.9rem' }}>{job.profile_name || 'Facebook'}</span>
-                    <p style={{ fontSize: '.78rem', color: 'var(--text-tertiary)', margin: '4px 0 0' }}>
-                      {job.started_at ? new Date(job.started_at).toLocaleString(chartLocale) : '—'}
-                    </p>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, minWidth: 0 }}>
+                    <ProfileAvatar url={job.profile_picture_url} name={job.profile_name} size={40} />
+                    <div style={{ minWidth: 0 }}>
+                      <span style={{ fontWeight: 700, fontSize: '.9rem' }}>{job.profile_name || 'Facebook'}</span>
+                      <p style={{ fontSize: '.78rem', color: 'var(--text-tertiary)', margin: '4px 0 0' }}>
+                        {job.started_at ? new Date(job.started_at).toLocaleString(chartLocale) : '—'}
+                      </p>
+                    </div>
                   </div>
                   <span className={`badge ${job.status === 'completed' ? 'badge-green' : job.status === 'failed' ? 'badge-red' : 'badge-amber'}`}>
-                    {job.status}
+                    {job.status === 'completed' ? t('ovScrapesCompleted') : job.status}
                   </span>
                 </div>
               ))

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import api from '../../services/api'
 import { useLanguage } from '../../LanguageContext'
 import { useDashPage, PageHero, DashKpi, DashCard, DashLoading, DashModal } from '../../components/dashboard/DashboardUI'
+import { ProfileAvatar } from '../../components/dashboard/ProfileAvatar'
 
 const ConnectedAccounts = () => {
   const [showModal, setShowModal] = useState(false)
@@ -169,7 +170,12 @@ const ConnectedAccounts = () => {
             <tbody>
               {jobs.slice(0, 5).map((job, i) => (
                 <tr key={i}>
-                  <td style={{ fontWeight: 700 }}>{job.profile_name || '—'}</td>
+                  <td>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexDirection: isRTL ? 'row' : 'row-reverse' }}>
+                      <ProfileAvatar url={job.profile_picture_url} name={job.profile_name} size={32} />
+                      <span style={{ fontWeight: 700 }}>{job.profile_name || '—'}</span>
+                    </div>
+                  </td>
                   <td>{t('caPlatformFB')}</td>
                   <td><span className={`badge badge-green`}>{job.status === 'completed' ? t('caJobCompleted') : job.status}</span></td>
                   <td className="mono">{job.records_fetched}</td>
@@ -216,13 +222,7 @@ const ConnectedAccounts = () => {
 const AccountCard = ({ acc, onDelete, onToggle, onSync, isSyncing, t, isRTL, lang }) => (
   <div className="dash-account-card animate-fade-up" style={{ position: 'relative', textAlign: isRTL ? 'right' : 'left' }}>
     <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '18px', flexDirection: isRTL ? 'row' : 'row-reverse' }}>
-      <div style={{ width: '42px', height: '42px', borderRadius: '10px', background: 'rgba(24, 119, 242, 0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-        {acc.profile_picture_url ? (
-          <img src={acc.profile_picture_url} alt={acc.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-        ) : (
-          <svg width="22" height="22" fill="#1877F2" viewBox="0 0 24 24"><path d="M9 8h-3v4h3v12h5v-12h3.642l.358-4h-4v-1.667c0-.955.192-1.333 1.115-1.333h2.885v-5h-3.808c-3.596 0-5.192 1.583-5.192 4.615v3.385z"/></svg>
-        )}
-      </div>
+      <ProfileAvatar url={acc.profile_picture_url} name={acc.name} size={42} />
       <div style={{ flex: 1 }}>
         <div style={{ fontWeight: 700, fontSize: '.95rem', marginBottom: '2px' }}>{acc.name}</div>
         <div className="mono" style={{ fontSize: '.78rem', color: 'var(--text-tertiary)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', maxWidth: '180px' }}>{acc.url}</div>
