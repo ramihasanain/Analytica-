@@ -9,7 +9,6 @@ const Posts = () => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [filter, setFilter] = useState('all')
-  const [platformFilter, setPlatformFilter] = useState('all')
   const [profileFilter, setProfileFilter] = useState('all')
   const [topicFilter, setTopicFilter] = useState('الكل')
   const [profiles, setProfiles] = useState([])
@@ -189,9 +188,8 @@ const Posts = () => {
     return commentsList.filter(c => c.sentiment === targetSentiment)
   }
 
-  // Filter parent posts based on selected platform, topic, profile, and their comment sentiments
+  // Filter parent posts based on topic, profile, and comment sentiments
   const filtered = posts.filter(p => {
-    const platMatch = platformFilter === 'all' || p.platform === platformFilter
     const topicMatch = topicFilter === 'الكل' || p.topic === topicFilter
     const profileMatch = profileFilter === 'all' || p.profile_id === parseInt(profileFilter)
 
@@ -204,7 +202,7 @@ const Posts = () => {
       sentMatch = postComments.some(c => c.sentiment === targetSentiment)
     }
 
-    return sentMatch && platMatch && topicMatch && profileMatch
+    return sentMatch && topicMatch && profileMatch
   })
 
   return (

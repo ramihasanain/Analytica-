@@ -6,7 +6,6 @@ import { ProfileAvatar } from '../../components/dashboard/ProfileAvatar'
 
 const ConnectedAccounts = () => {
   const [showModal, setShowModal] = useState(false)
-  const [modalPlatform, setModalPlatform] = useState('facebook')
   const [accounts, setAccounts] = useState([])
   const [loading, setLoading] = useState(true)
   const [jobs, setJobs] = useState([])
@@ -94,9 +93,9 @@ const ConnectedAccounts = () => {
     }
   }
 
-  const handleConnect = async (platform) => {
+  const handleConnect = async () => {
     try {
-      const res = await api.get(`/oauth/${platform}/login/`)
+      const res = await api.get('/oauth/facebook/login/')
       if (res.data.auth_url) {
         window.location.href = res.data.auth_url
       }
@@ -203,7 +202,7 @@ const ConnectedAccounts = () => {
             <p style={{ fontSize: '.9rem', color: 'var(--text-secondary)', marginBottom: '28px' }}>{t('caModalDesc')}</p>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '32px' }}>
-              <button type="button" onClick={() => handleConnect('facebook')} style={{ padding: '16px', border: '1.5px solid var(--border)', borderRadius: 'var(--radius-sm)', background: 'rgba(24, 119, 242, 0.08)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontWeight: 700, fontSize: '1rem', fontFamily: isRTL ? 'var(--font-ar)' : 'var(--font-en)', color: '#1877F2', width: '100%' }}>
+              <button type="button" onClick={handleConnect} style={{ padding: '16px', border: '1.5px solid var(--border)', borderRadius: 'var(--radius-sm)', background: 'rgba(24, 119, 242, 0.08)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontWeight: 700, fontSize: '1rem', fontFamily: isRTL ? 'var(--font-ar)' : 'var(--font-en)', color: '#1877F2', width: '100%' }}>
                 <svg width="24" height="24" fill="#1877F2" viewBox="0 0 24 24"><path d="M9 8h-3v4h3v12h5v-12h3.642l.358-4h-4v-1.667c0-.955.192-1.333 1.115-1.333h2.885v-5h-3.808c-3.596 0-5.192 1.583-5.192 4.615v3.385z"/></svg>
                 {t('caConnectFB')}
               </button>
